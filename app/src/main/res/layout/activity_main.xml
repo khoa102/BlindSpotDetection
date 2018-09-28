@@ -17,6 +17,7 @@
         android:background="?android:attr/selectableItemBackground"
         android:cropToPadding="false"
         android:elevation="0dp"
+        android:onClick="runThread"
         android:rotation="180"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"

@@ -2,11 +2,19 @@ package com.example.blindspotdetection;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.os.AsyncTask;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Looper;
+import android.os.Message;
+import android.os.Messenger;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.TextView;
 
 import java.io.IOException;
@@ -16,11 +24,50 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.concurrent.Executor;
 
 public class MainActivity extends AppCompatActivity {
     private SensorConnection sensorConnection;
     private final static int REQUEST_ENABLE_BT = 1;
     private TextView textView;
+
+    /** Messenger for communicating with the service. */
+    Messenger mService = null;
+
+    /** Flag indicating whether we have called bind on the service. */
+    boolean mBound;
+
+    private Handler handler = new Handler(Looper.getMainLooper()){
+        @Override
+        public void handleMessage(Message msg) {
+            // Suppose to execute visualizer
+            System.out.println(msg.obj);
+            textView.setText(textView.getText() + msg.obj.toString());
+        }
+    };
+
+    /**
+     * Class for interacting with the main interface of the service.
+     */
+    private ServiceConnection mConnection = new ServiceConnection() {
+        public void onServiceConnected(ComponentName className, IBinder service) {
+            // This is called when the connection with the service has been
+            // established, giving us the object we can use to
+            // interact with the service.  We are communicating with the
+            // service using a Messenger, so here we get a client-side
+            // representation of that from the raw IBinder object.
+            mService = new Messenger(service);
+            mBound = true;
+        }
+
+        public void onServiceDisconnected(ComponentName className) {
+            // This is called when the connection with the service has been
+            // unexpectedly disconnected -- that is, its process crashed.
+            mService = null;
+            mBound = false;
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -34,11 +81,10 @@ public class MainActivity extends AppCompatActivity {
             textView.setText("True");
         else
             textView.setText("False");
+    }
 
-        //Create an instance of AsyncTask
-        ClientAsyncTask clientAST = new ClientAsyncTask();
-        //Pass the server ip, port and client message to the AsyncTask
-        clientAST.execute("192.168.1.1", "8080","Hello from client");
+    public void runThread(View view){
+//        new Thread(new SensorReceiverRunnable("192.168.1.1", "8080", handler)).run();
     }
 
     private BluetoothAdapter setUpBluetooth(){
@@ -56,44 +102,23 @@ public class MainActivity extends AppCompatActivity {
         return adapter;
     }
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+        // Bind to the service
+        Intent intent = new Intent(this, SensorReceiverService.class);
+        intent.putExtra("IP", "192.168.1.1");
+        intent.putExtra("port", "8080");
+        bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
+    }
 
-    /**
-      * AsyncTask which handles the communication with the server
-      */
-    class ClientAsyncTask extends AsyncTask<String, Void, String> {
-        @Override
-        protected String doInBackground(String... params) {
-            String result = null;
-            try {
-                //Create a client socket and define internet address and the port of the server
-                Socket socket = new Socket(params[0], Integer.parseInt(params[1]));
-
-                //Get the input stream of the client socket
-                InputStream is = socket.getInputStream();
-                //Get the output stream of the client socket
-                PrintWriter out = new PrintWriter(socket.getOutputStream(),true);
-                //Write data to the output stream of the client socket
-                out.println(params[2]);
-                //Buffer the data coming from the input stream
-                BufferedReader br = new BufferedReader(new InputStreamReader(is));
-                //Read data in the input buffer
-                result = br.readLine();
-                //Close the client socket
-                socket.close();
-            } catch (NumberFormatException e) {
-                e.printStackTrace();
-            } catch (UnknownHostException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            return result;
-        }
-
-        @Override
-        protected void onPostExecute(String s) {
-            //Write server message to the text view
-            textView.setText(textView.getText() + s);
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // Unbind from the service
+        if (mBound) {
+            unbindService(mConnection);
+            mBound = false;
         }
     }
 

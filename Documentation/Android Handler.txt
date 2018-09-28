@@ -1,0 +1,7 @@
+The Handler class behaves different than I expected.
+
+I expect it to be a message queue that can send message between different handler that is running in diferent class using the same looper. 
+
+But it can only send to the handler that is declared in that class. It will run in the thread that you declare but it will not execute the handler in a nother thread that in attaches to the same loooper. In order to send to another class, a handler from that class need to be passed to the constructor.
+
+When in main thread, you can get and change the UI element but other thread cannot.
