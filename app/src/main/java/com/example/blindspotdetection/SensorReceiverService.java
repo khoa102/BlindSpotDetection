@@ -9,6 +9,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.Process;
+import android.os.RemoteException;
 import android.widget.Toast;
 
 import java.io.BufferedReader;
@@ -69,72 +70,71 @@ import java.net.UnknownHostException;
 public class SensorReceiverService extends Service {
     private Looper mServiceLooper;
     private ServiceHandler mServiceHandler;
-    private Handler mainHandler;
     private String IP;
     private String port;
 
-    /**
-     * Target we publish for clients to send messages to Service Handler.
-     */
-    Messenger mMessenger;
-
-    /**
-     * Command to the service to set Main Handler
-     */
-    static final int MSG_SET_MAIN_HANDLER = 1;
-
-    /**
-     * Command to the service to start listening for UDP packet
-     */
+    /**  Command to the service to set Main Handler. */
+    static final int MSG_SET_MAIN_MESSENGER = 1;
+    /**  Command to the service to start listening for UDP packet.  */
     static final int MSG_START_LISTENING = 2;
-
-    /**
-     * Command to the service to stop the service
-     */
+    /**  Command to the service to stop the service. */
     static final int MSG_STOP_SERVICE = 3;
 
-    // Handler that receives messages from the thread
+    /** Keeps track of main clients. */
+    Messenger mainClient;
+    /**  Target we publish for clients to send messages to Service Handler. */
+    Messenger mMessenger;
+
+    /** Handler that receives messages from the thread */
     private final class ServiceHandler extends Handler {
-        public ServiceHandler(Looper looper) {
+        ServiceHandler(Looper looper) {
             super(looper);
         }
         @Override
         public void handleMessage(Message msg) {
+
             switch (msg.what) {
-                case MSG_SET_MAIN_HANDLER:
-                    mainHandler = (Handler)msg.obj;
-                    break;
-                case MSG_START_LISTENING:
-                    String result = "";
+                case MSG_SET_MAIN_MESSENGER:
+                    System.out.println("receive message");
+
+                    mainClient = msg.replyTo;
+                    Message message = new Message();
+                    message.obj = "Receive from Runnable";
                     try {
-                        //Create a client socket and define internet address and the port of the server
-                        Socket socket = new Socket(IP, Integer.parseInt(port));
-
-                        //Get the input stream of the client socket
-                        InputStream is = socket.getInputStream();
-                        //Get the output stream of the client socket
-                        PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-
-                        //Write data to the output stream of the client socket
-                        //out.println(params[2]);
-
-                        //Buffer the data coming from the input stream
-                        BufferedReader br = new BufferedReader(new InputStreamReader(is));
-                        //Read data in the input buffer
-                        result = br.readLine();
-                        //Close the client socket
-                        socket.close();
-                    } catch (NumberFormatException e) {
-                        e.printStackTrace();
-                    } catch (UnknownHostException e) {
-                        e.printStackTrace();
-                    } catch (IOException e) {
+                        mainClient.send(message);
+                    } catch (RemoteException e) {
                         e.printStackTrace();
                     }
 
-                    Message message = mainHandler.obtainMessage();
-                    message.obj = "Receive from Runnable";
-                    mainHandler.sendMessage(message);
+                    System.out.println("Message sent");
+                    break;
+                case MSG_START_LISTENING:
+                    String result = "";
+//                    try {
+//                        //Create a client socket and define internet address and the port of the server
+//                        Socket socket = new Socket(IP, Integer.parseInt(port));
+//
+//                        //Get the input stream of the client socket
+//                        InputStream is = socket.getInputStream();
+//                        //Get the output stream of the client socket
+//                        //PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+//
+//                        //Write data to the output stream of the client socket
+//                        //out.println(params[2]);
+//
+//                        //Buffer the data coming from the input stream
+//                        BufferedReader br = new BufferedReader(new InputStreamReader(is));
+//                        //Read data in the input buffer
+//                        result = br.readLine();
+//                        //Close the client socket
+//                        socket.close();
+//                    } catch (NumberFormatException e) {
+//                        e.printStackTrace();
+//                    } catch (UnknownHostException e) {
+//                        e.printStackTrace();
+//                    } catch (IOException e) {
+//                        e.printStackTrace();
+//                    }
                     break;
                 case MSG_STOP_SERVICE:
                     // Stop the service using the startId, so that we don't stop
@@ -158,6 +158,7 @@ public class SensorReceiverService extends Service {
         // Get the HandlerThread's Looper and use it for our Handler
         mServiceLooper = thread.getLooper();
         mServiceHandler = new ServiceHandler(mServiceLooper);
+        mMessenger = new Messenger(mServiceHandler);
     }
 
     @Override
@@ -179,6 +180,7 @@ public class SensorReceiverService extends Service {
         Message msg = mServiceHandler.obtainMessage();
         msg.arg1 = startId;
         mServiceHandler.sendMessage(msg);
+        System.out.println("Service start normally");
 
         // If we get killed, after returning from here, restart
         return START_STICKY;
@@ -195,9 +197,7 @@ public class SensorReceiverService extends Service {
             IP = intent.getStringExtra("IP");
             port = intent.getStringExtra("port");
         }
-
         Toast.makeText(getApplicationContext(), "binding", Toast.LENGTH_SHORT).show();
-        mMessenger = new Messenger(mServiceHandler);
         return mMessenger.getBinder();
     }
 

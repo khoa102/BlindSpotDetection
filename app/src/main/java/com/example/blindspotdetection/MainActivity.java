@@ -12,6 +12,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.Messenger;
+import android.os.RemoteException;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
@@ -31,6 +32,7 @@ public class MainActivity extends AppCompatActivity {
     private final static int REQUEST_ENABLE_BT = 1;
     private TextView textView;
 
+
     /** Messenger for communicating with the service. */
     Messenger mService = null;
 
@@ -46,9 +48,10 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    /**
-     * Class for interacting with the main interface of the service.
-     */
+    /** Target we publish for clients to send messages to IncomingHandler. */
+    final Messenger mMessenger = new Messenger(handler);
+
+    /** Class for interacting with the main interface of the service. */
     private ServiceConnection mConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder service) {
             // This is called when the connection with the service has been
@@ -85,6 +88,39 @@ public class MainActivity extends AppCompatActivity {
 
     public void runThread(View view){
 //        new Thread(new SensorReceiverRunnable("192.168.1.1", "8080", handler)).run();
+        if (mBound)
+            textView.setText(textView.getText() + "Service is still bound");
+        else
+            textView.setText(textView.getText() + "Service is not bound");
+        setMainMessenger();
+    }
+
+    private void setMainMessenger(){
+        if (!mBound) return;
+
+        // Create and send a message to the service, using a supported 'what' value
+        Message msg = Message.obtain();
+        msg.what = SensorReceiverService.MSG_SET_MAIN_MESSENGER;
+        msg.replyTo = mMessenger;
+        try {
+            mService.send(msg);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    private void startService(){
+        if (!mBound) return;
+
+        // Create and send a message to the service, using a supported 'what' value
+        Message msg = Message.obtain();
+        msg.what = SensorReceiverService.MSG_START_LISTENING;
+        try {
+            mService.send(msg);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
     }
 
     private BluetoothAdapter setUpBluetooth(){
@@ -106,10 +142,13 @@ public class MainActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         // Bind to the service
-        Intent intent = new Intent(this, SensorReceiverService.class);
+        // Using explicit intent to avoid trouble
+        Intent intent = new Intent(this, com.example.blindspotdetection.SensorReceiverService.class);
         intent.putExtra("IP", "192.168.1.1");
         intent.putExtra("port", "8080");
         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
+
+        setMainMessenger();
     }
 
     @Override
