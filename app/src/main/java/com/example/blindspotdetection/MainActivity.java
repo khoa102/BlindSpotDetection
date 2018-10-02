@@ -6,7 +6,6 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -18,14 +17,10 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.TextView;
 
-import java.io.IOException;
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.Socket;
-import java.net.UnknownHostException;
-import java.util.concurrent.Executor;
+import com.jjoe64.graphview.GraphView;
+import com.jjoe64.graphview.series.DataPoint;
+import com.jjoe64.graphview.series.LineGraphSeries;
+
 
 public class MainActivity extends AppCompatActivity {
     private SensorConnection sensorConnection;
@@ -34,10 +29,13 @@ public class MainActivity extends AppCompatActivity {
 
 
     /** Messenger for communicating with the service. */
-    Messenger mService = null;
+    private Messenger mService = null;
 
     /** Flag indicating whether we have called bind on the service. */
-    boolean mBound;
+    private boolean mBound;
+
+    /** Flag to remember the status of the service */
+    private boolean running = false;
 
     private Handler handler = new Handler(Looper.getMainLooper()){
         @Override
@@ -88,10 +86,10 @@ public class MainActivity extends AppCompatActivity {
 
     public void runThread(View view){
 //        new Thread(new SensorReceiverRunnable("192.168.1.1", "8080", handler)).run();
-        if (mBound)
-            textView.setText(textView.getText() + "Service is still bound");
-        else
-            textView.setText(textView.getText() + "Service is not bound");
+//        if (mBound)
+//            textView.setText(textView.getText() + "Service is still bound");
+//        else
+//            textView.setText(textView.getText() + "Service is not bound");
         setMainMessenger();
     }
 
@@ -110,12 +108,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private void startService(){
+    public void startReceiver(View view){
         if (!mBound) return;
 
         // Create and send a message to the service, using a supported 'what' value
         Message msg = Message.obtain();
-        msg.what = SensorReceiverService.MSG_START_LISTENING;
+        if (!running) {
+            msg.what = SensorReceiverService.MSG_START_LISTENING;
+            running = true;
+        }else {
+            msg.what = SensorReceiverService.MSG_STOP_SERVICE;
+            running = false;
+        }
+        // Create a CountDownTimer to make the SensorReceiver to report back every one minute.
+//        msg.obj = (60000, 10000);
         try {
             mService.send(msg);
         } catch (RemoteException e) {
@@ -149,6 +155,16 @@ public class MainActivity extends AppCompatActivity {
         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
 
         setMainMessenger();
+
+        GraphView graph = (GraphView) findViewById(R.id.graph);
+        LineGraphSeries<DataPoint> series = new LineGraphSeries<>(new DataPoint[] {
+                new DataPoint(0, 1),
+                new DataPoint(1, 5),
+                new DataPoint(2, 3),
+                new DataPoint(3, 2),
+                new DataPoint(4, 6)
+        });
+        graph.addSeries(series);
     }
 
     @Override

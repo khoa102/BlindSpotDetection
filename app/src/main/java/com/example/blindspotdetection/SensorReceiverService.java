@@ -17,61 +17,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.Socket;
-import java.net.UnknownHostException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.SocketException;
 
-//public class SensorReceiverRunnable implements Runnable {
-//    private String IP;
-//    private String port;
-//    private Handler mainHandler;
-//
-//    public SensorReceiverRunnable(String IP, String port, Handler handler){
-//        this.IP = IP;
-//        this.port = port;
-//        mainHandler = handler;
-//    }
-//
-//    @Override
-//    public void run() {
-//        String result = "Hello for now";
-////        try {
-////            //Create a client socket and define internet address and the port of the server
-////            Socket socket = new Socket(IP, Integer.parseInt(port));
-////
-////            //Get the input stream of the client socket
-////            InputStream is = socket.getInputStream();
-////            //Get the output stream of the client socket
-////            PrintWriter out = new PrintWriter(socket.getOutputStream(),true);
-////
-////            //Write data to the output stream of the client socket
-////            //out.println(params[2]);
-////
-////            //Buffer the data coming from the input stream
-////            BufferedReader br = new BufferedReader(new InputStreamReader(is));
-////            //Read data in the input buffer
-////            result = br.readLine();
-////            //Close the client socket
-////            socket.close();
-////        } catch (NumberFormatException e) {
-////            e.printStackTrace();
-////        } catch (UnknownHostException e) {
-////            e.printStackTrace();
-////        } catch (IOException e) {
-////            e.printStackTrace();
-////        }
-//
-//        Message message = mainHandler.obtainMessage();
-//        message.obj = "Receive from Runnable";
-//        mainHandler.sendMessage(message);
-//    }
-//
-//}
 
 public class SensorReceiverService extends Service {
     private Looper mServiceLooper;
     private ServiceHandler mServiceHandler;
     private String IP;
     private String port;
+    private boolean isListening;
+
+    /** A TAG for logging. */
+    static final String TAG = "SensorReceiverService";
 
     /**  Command to the service to set Main Handler. */
     static final int MSG_SET_MAIN_MESSENGER = 1;
@@ -80,10 +40,16 @@ public class SensorReceiverService extends Service {
     /**  Command to the service to stop the service. */
     static final int MSG_STOP_SERVICE = 3;
 
+
     /** Keeps track of main clients. */
     Messenger mainClient;
     /**  Target we publish for clients to send messages to Service Handler. */
     Messenger mMessenger;
+    Message message;
+
+    private DatagramSocket socket;
+    private boolean running = false;
+    private byte[] buf = new byte[1025];
 
     /** Handler that receives messages from the thread */
     private final class ServiceHandler extends Handler {
@@ -98,8 +64,8 @@ public class SensorReceiverService extends Service {
                     System.out.println("receive message");
 
                     mainClient = msg.replyTo;
-                    Message message = new Message();
-                    message.obj = "Receive from Runnable";
+                    message = new Message();
+                    message.obj = "Receive from Service";
                     try {
                         mainClient.send(message);
                     } catch (RemoteException e) {
@@ -110,36 +76,52 @@ public class SensorReceiverService extends Service {
                     break;
                 case MSG_START_LISTENING:
                     String result = "";
-//                    try {
-//                        //Create a client socket and define internet address and the port of the server
-//                        Socket socket = new Socket(IP, Integer.parseInt(port));
-//
-//                        //Get the input stream of the client socket
-//                        InputStream is = socket.getInputStream();
-//                        //Get the output stream of the client socket
-//                        //PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-//
-//                        //Write data to the output stream of the client socket
-//                        //out.println(params[2]);
-//
-//                        //Buffer the data coming from the input stream
-//                        BufferedReader br = new BufferedReader(new InputStreamReader(is));
-//                        //Read data in the input buffer
-//                        result = br.readLine();
-//                        //Close the client socket
-//                        socket.close();
-//                    } catch (NumberFormatException e) {
-//                        e.printStackTrace();
-//                    } catch (UnknownHostException e) {
-//                        e.printStackTrace();
-//                    } catch (IOException e) {
-//                        e.printStackTrace();
-//                    }
+                    try {
+                        socket = new DatagramSocket(4445);
+                        socket.setSoTimeout(10000);
+                    } catch (SocketException e){
+                        e.printStackTrace();
+                    }
+                    running = true;
+                    while (running) {
+                        DatagramPacket packet = new DatagramPacket(buf, buf.length);
+                        try {
+
+                            System.out.println("Setting up socket. Waiting: ");
+                            socket.receive(packet);
+                            System.out.println("Packet received!");
+                            String received = new String(packet.getData(), 0, packet.getLength());
+
+                            InetAddress address = packet.getAddress();
+                            int port = packet.getPort();
+
+                            packet = new DatagramPacket(buf, buf.length, address, port);
+
+
+                            if (received.equals("end") || mServiceHandler.hasMessages(MSG_STOP_SERVICE)) {
+                                running = false;
+                                socket.close();
+                                continue;
+                            }
+                            System.out.println("Toasting!");
+                            Toast.makeText(getApplicationContext(), "Get Packet", Toast.LENGTH_SHORT).show();
+//                            socket.send(packet);
+                            message = new Message();
+                            message.obj = received;
+                            System.out.println("Sending Message!");
+                            mainClient.send(message);
+                        }  catch (IOException e) {
+                            e.printStackTrace();
+                        } catch (RemoteException e){
+                            e.printStackTrace();
+                        }
+                    }
+//                    socket.close();
                     break;
-                case MSG_STOP_SERVICE:
-                    // Stop the service using the startId, so that we don't stop
-                    // the service in the middle of handling another job
-                    stopSelf(msg.arg1);
+//                case MSG_STOP_SERVICE:
+//                    // Stop the service using the startId, so that we don't stop
+//                    // the service in the middle of handling another job
+//                    stopSelf(msg.arg1);
             }
         }
     }
