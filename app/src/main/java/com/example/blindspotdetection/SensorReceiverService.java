@@ -10,6 +10,7 @@ import android.os.Message;
 import android.os.Messenger;
 import android.os.Process;
 import android.os.RemoteException;
+import android.util.Log;
 import android.widget.Toast;
 
 import java.io.BufferedReader;
@@ -26,9 +27,8 @@ import java.net.SocketException;
 public class SensorReceiverService extends Service {
     private Looper mServiceLooper;
     private ServiceHandler mServiceHandler;
-    private String IP;
-    private String port;
-    private boolean isListening;
+    /** A variable to keep control of the thread for the service. */
+    private HandlerThread thread;
 
     /** A TAG for logging. */
     static final String TAG = "SensorReceiverService";
@@ -37,8 +37,10 @@ public class SensorReceiverService extends Service {
     static final int MSG_SET_MAIN_MESSENGER = 1;
     /**  Command to the service to start listening for UDP packet.  */
     static final int MSG_START_LISTENING = 2;
+    /**  Command to the service to start listening for UDP packet.  */
+    static final int MSG_STOP_LISTENING = 3;
     /**  Command to the service to stop the service. */
-    static final int MSG_STOP_SERVICE = 3;
+    static final int MSG_STOP_SERVICE = 4;
 
 
     /** Keeps track of main clients. */
@@ -75,12 +77,12 @@ public class SensorReceiverService extends Service {
                     System.out.println("Message sent");
                     break;
                 case MSG_START_LISTENING:
-                    String result = "";
                     try {
                         socket = new DatagramSocket(4445);
                         socket.setSoTimeout(10000);
                     } catch (SocketException e){
-                        e.printStackTrace();
+                        Log.e(TAG, "Socket Exception");
+//                        e.printStackTrace();
                     }
                     running = true;
                     while (running) {
@@ -92,36 +94,40 @@ public class SensorReceiverService extends Service {
                             System.out.println("Packet received!");
                             String received = new String(packet.getData(), 0, packet.getLength());
 
-                            InetAddress address = packet.getAddress();
-                            int port = packet.getPort();
-
-                            packet = new DatagramPacket(buf, buf.length, address, port);
-
-
-                            if (received.equals("end") || mServiceHandler.hasMessages(MSG_STOP_SERVICE)) {
+//                            InetAddress address = packet.getAddress();
+//                            int port = packet.getPort();
+//
+//                            packet = new DatagramPacket(buf, buf.length, address, port);
+//                            socket.send(packet);
+                            if (received.equals("end")){
                                 running = false;
                                 socket.close();
-                                continue;
                             }
-                            System.out.println("Toasting!");
-                            Toast.makeText(getApplicationContext(), "Get Packet", Toast.LENGTH_SHORT).show();
-//                            socket.send(packet);
+                            Toast.makeText(getApplicationContext(), "Receive Packet", Toast.LENGTH_SHORT).show();
+
                             message = new Message();
                             message.obj = received;
                             System.out.println("Sending Message!");
                             mainClient.send(message);
                         }  catch (IOException e) {
-                            e.printStackTrace();
+//                            e.printStackTrace();
+                            Log.e(TAG, "IO Exception");
                         } catch (RemoteException e){
-                            e.printStackTrace();
+//                            e.printStackTrace();
+                            Log.e(TAG, "Remote Exception");
+                        }
+                        if (mServiceHandler.hasMessages(MSG_STOP_LISTENING)){
+                            running = false;
+                            socket.close();
                         }
                     }
-//                    socket.close();
                     break;
-//                case MSG_STOP_SERVICE:
+                case MSG_STOP_SERVICE:
 //                    // Stop the service using the startId, so that we don't stop
 //                    // the service in the middle of handling another job
-//                    stopSelf(msg.arg1);
+                    stopSelf(msg.arg1);
+                default:
+                    super.handleMessage(message);
             }
         }
     }
@@ -132,7 +138,7 @@ public class SensorReceiverService extends Service {
         // separate thread because the service normally runs in the process's
         // main thread, which we don't want to block. We also make it
         // background priority so CPU-intensive work doesn't disrupt our UI.
-        HandlerThread thread = new HandlerThread("Radar Sensor Receiver",
+        thread = new HandlerThread("Radar Sensor Receiver",
                 Process.THREAD_PRIORITY_BACKGROUND);
         thread.start();
 
@@ -147,40 +153,26 @@ public class SensorReceiverService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         Toast.makeText(this, "service starting", Toast.LENGTH_SHORT).show();
 
-        // Check to make sure that port and IP are included in the intent
-        if (!intent.hasExtra("port") || !intent.hasExtra("IP")){
-            stopSelf();
-            return START_NOT_STICKY;
-        }
-        else {
-            IP = intent.getStringExtra("IP");
-            port = intent.getStringExtra("port");
-        }
-
         // For each start request, send a message to start a job and deliver the
         // start ID so we know which request we're stopping when we finish the job
         Message msg = mServiceHandler.obtainMessage();
         msg.arg1 = startId;
         mServiceHandler.sendMessage(msg);
-        System.out.println("Service start normally");
-
         // If we get killed, after returning from here, restart
         return START_STICKY;
     }
 
     @Override
     public IBinder onBind(Intent intent) {
-        // Check to make sure that port and IP are included in the intent
-        if (!intent.hasExtra("port") || !intent.hasExtra("IP")){
-            stopSelf();
-            return null;
-        }
-        else {
-            IP = intent.getStringExtra("IP");
-            port = intent.getStringExtra("port");
-        }
         Toast.makeText(getApplicationContext(), "binding", Toast.LENGTH_SHORT).show();
         return mMessenger.getBinder();
+    }
+
+    @Override
+    public boolean onUnbind(Intent intent) {
+        if (!socket.isClosed()) socket.close();
+
+        return true;
     }
 
     @Override

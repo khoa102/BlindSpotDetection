@@ -14,6 +14,7 @@ import android.os.Messenger;
 import android.os.RemoteException;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 
@@ -23,12 +24,18 @@ import com.jjoe64.graphview.series.LineGraphSeries;
 
 
 public class MainActivity extends AppCompatActivity {
+    /** Variable for setting up connection*/
     private SensorConnection sensorConnection;
     private final static int REQUEST_ENABLE_BT = 1;
+
+    /** View that is used to put information on the screen */
     private TextView textView;
+    GraphView graph = (GraphView) findViewById(R.id.graph);
 
+    /** A TAG for logging. */
+    static final String TAG = "MainActivity";
 
-    /** Messenger for communicating with the service. */
+    /** Messenger of the Service to send message to the Service. */
     private Messenger mService = null;
 
     /** Flag indicating whether we have called bind on the service. */
@@ -46,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    /** Target we publish for clients to send messages to IncomingHandler. */
+    /** Messenger we publish for Service to send messages back. */
     final Messenger mMessenger = new Messenger(handler);
 
     /** Class for interacting with the main interface of the service. */
@@ -82,6 +89,56 @@ public class MainActivity extends AppCompatActivity {
             textView.setText("True");
         else
             textView.setText("False");
+
+        // Bind to the service
+        // Using explicit intent to avoid trouble
+        Intent intent = new Intent(this, com.example.blindspotdetection.SensorReceiverService.class);
+        intent.putExtra("IP", "192.168.1.1");
+        intent.putExtra("port", "8080");
+        startService(intent);
+        bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
+
+        setMainMessenger();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        LineGraphSeries<DataPoint> series = new LineGraphSeries<>(new DataPoint[] {
+                new DataPoint(0, 1),
+                new DataPoint(1, 5),
+                new DataPoint(2, 3),
+                new DataPoint(3, 2),
+                new DataPoint(4, 6)
+        });
+        graph.getViewport().setXAxisBoundsManual(true);
+        graph.getViewport().setYAxisBoundsManual(true);
+//        graph.getViewport().setMinimalViewport(minX, maxX, 0, maxY);
+
+        graph.addSeries(series);
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+    }
+
+    @Override
+    protected void onDestroy(){
+        // Unbind from the service
+        if (mBound) {
+            Message msg = Message.obtain();
+            msg.what = SensorReceiverService.MSG_STOP_LISTENING;
+            try {
+                mService.send(msg);
+            }
+            catch (RemoteException e){
+                Log.e(TAG, "Remote Exception when stop listening onDestroy");
+            }
+            unbindService(mConnection);
+            mBound = false;
+        }
+        super.onDestroy();
     }
 
     public void runThread(View view){
@@ -103,7 +160,7 @@ public class MainActivity extends AppCompatActivity {
         try {
             mService.send(msg);
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Log.e(TAG, "Remote Exception in SET_MAIN_MESSENGER");
         }
     }
 
@@ -117,7 +174,7 @@ public class MainActivity extends AppCompatActivity {
             msg.what = SensorReceiverService.MSG_START_LISTENING;
             running = true;
         }else {
-            msg.what = SensorReceiverService.MSG_STOP_SERVICE;
+            msg.what = SensorReceiverService.MSG_STOP_LISTENING;
             running = false;
         }
         // Create a CountDownTimer to make the SensorReceiver to report back every one minute.
@@ -143,38 +200,4 @@ public class MainActivity extends AppCompatActivity {
 
         return adapter;
     }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        // Bind to the service
-        // Using explicit intent to avoid trouble
-        Intent intent = new Intent(this, com.example.blindspotdetection.SensorReceiverService.class);
-        intent.putExtra("IP", "192.168.1.1");
-        intent.putExtra("port", "8080");
-        bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
-
-        setMainMessenger();
-
-        GraphView graph = (GraphView) findViewById(R.id.graph);
-        LineGraphSeries<DataPoint> series = new LineGraphSeries<>(new DataPoint[] {
-                new DataPoint(0, 1),
-                new DataPoint(1, 5),
-                new DataPoint(2, 3),
-                new DataPoint(3, 2),
-                new DataPoint(4, 6)
-        });
-        graph.addSeries(series);
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-        // Unbind from the service
-        if (mBound) {
-            unbindService(mConnection);
-            mBound = false;
-        }
-    }
-
 }
