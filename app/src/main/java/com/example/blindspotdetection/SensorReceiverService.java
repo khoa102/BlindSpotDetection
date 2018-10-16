@@ -71,7 +71,7 @@ public class SensorReceiverService extends Service {
                     try {
                         mainClient.send(message);
                     } catch (RemoteException e) {
-                        e.printStackTrace();
+                        Log.e(TAG, "Remote Exception while sending message back to main.");
                     }
 
                     System.out.println("Message sent");
@@ -79,10 +79,9 @@ public class SensorReceiverService extends Service {
                 case MSG_START_LISTENING:
                     try {
                         socket = new DatagramSocket(4445);
-                        socket.setSoTimeout(10000);
+                        socket.setSoTimeout(1000);
                     } catch (SocketException e){
                         Log.e(TAG, "Socket Exception");
-//                        e.printStackTrace();
                     }
                     running = true;
                     while (running) {
