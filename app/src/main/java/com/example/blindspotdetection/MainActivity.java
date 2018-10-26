@@ -6,6 +6,8 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.graphics.Point;
+import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -16,11 +18,16 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.series.DataPoint;
 import com.jjoe64.graphview.series.LineGraphSeries;
+import com.jjoe64.graphview.series.PointsGraphSeries;
+
+import java.io.IOException;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -30,7 +37,16 @@ public class MainActivity extends AppCompatActivity {
 
     /** View that is used to put information on the screen */
     private TextView textView;
-    GraphView graph = (GraphView) findViewById(R.id.graph);
+    GraphView graph;
+
+    /** A Point Series to represent the detected objects. */
+    PointsGraphSeries<DataPoint> pointSeries;
+
+    /** A list of detected data in the current frame. */
+    DetectedObject[] objects;
+
+    /** Media Player object to play sound. */
+    MediaPlayer player;
 
     /** A TAG for logging. */
     static final String TAG = "MainActivity";
@@ -44,12 +60,59 @@ public class MainActivity extends AppCompatActivity {
     /** Flag to remember the status of the service */
     private boolean running = false;
 
+    /** Command to the service to receive detected objects from Service.*/
+    public static final int MSG_DETECTED_OBJECT = 0;
+
+    /**  Command to the service to get a test message from the Service. */
+    public static final int MSG_GET_TEST_MESSAGE = 5;
+
     private Handler handler = new Handler(Looper.getMainLooper()){
         @Override
         public void handleMessage(Message msg) {
             // Suppose to execute visualizer
-            System.out.println(msg.obj);
-            textView.setText(textView.getText() + msg.obj.toString());
+            switch(msg.what) {
+                case MSG_GET_TEST_MESSAGE:
+                    textView.setText(textView.getText() + msg.obj.toString());
+                    break;
+                case MSG_DETECTED_OBJECT:
+                    byte buffer[] = (byte[]) msg.obj;
+                    /** An object to read the receive data packet and process it. */
+                    SensorProcessor sensorprocessor = new SensorProcessor();
+                    sensorprocessor.loadPacket(buffer);
+                    boolean result = sensorprocessor.processData();
+                    if (result){
+                        textView.setText(textView.getText() + "\n\n Successfully process data frame \n");
+                        DetectedObject[] objects = sensorprocessor.getDetectedObjects();
+                        for (int i =0; i < objects.length; i++){
+                            textView.setText(textView.getText() + objects[i].toString());
+                        }
+                        textView.setText(textView.getText() + "\n");
+
+                        sensorprocessor.sortDetectedObjects();
+                        DataPoint newDataPoint[] = new DataPoint[objects.length];
+                        int index = 0;
+                        for (DetectedObject object : objects){
+                            newDataPoint[index] = new DataPoint(object.getX(), object.getY());
+                            index++;
+                        }
+                        pointSeries.resetData(newDataPoint);
+                    }
+                    else {
+                        textView.setText(textView.getText() + "\n\n Failed process data frame \n");
+                    }
+//                    textView.setText(textView.getText());
+//                    String result = new String(buffer, 0, buffer.length);
+//                    textView.setText(textView.getText() +  result);//msg.obj.toString());
+//                    DetectedObject[] objects = (DetectedObject[]) msg.obj;
+
+//                    pointSeries.resetData(newDataPoint);
+////                    Toast.makeText(this, "Update Graph", Toast.LENGTH_SHORT).show();
+//                    Log.e(TAG, "UPDATE GRAPH");
+                    break;
+                default:
+                    super.handleMessage(msg);
+
+            }
         }
     };
 
@@ -97,25 +160,40 @@ public class MainActivity extends AppCompatActivity {
         intent.putExtra("port", "8080");
         startService(intent);
         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
-
         setMainMessenger();
+
+        graph = (GraphView) findViewById(R.id.graph);
+//        LineGraphSeries<DataPoint> series = new LineGraphSeries<>(new DataPoint[] {
+//                new DataPoint(0, 1),
+//                new DataPoint(1, 5),
+//                new DataPoint(2, 3),
+//                new DataPoint(3, 2),
+//                new DataPoint(4, 6)
+//        });
+        graph.getViewport().setXAxisBoundsManual(true);
+        graph.getViewport().setMinX(-2);
+        graph.getViewport().setMaxX(2);
+
+//        graph.getViewport().set
+        graph.getViewport().setYAxisBoundsManual(true);
+        graph.getViewport().setMinY(0);
+        graph.getViewport().setMaxY(5);
+        graph.getViewport().setScrollable(false); // disables horizontal scrolling
+        graph.getViewport().setScrollableY(false); // disables vertical scrolling
+        graph.getViewport().setScalable(false); // disables horizontal zooming and scrolling
+        graph.getViewport().setScalableY(false); // disables vertical zooming and scrolling
+        pointSeries = new PointsGraphSeries<DataPoint>();
+        pointSeries.setShape(PointsGraphSeries.Shape.RECTANGLE);
+
+        graph.addSeries(pointSeries);
+//        graph.addSeries(series);
+
+        setSound();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        LineGraphSeries<DataPoint> series = new LineGraphSeries<>(new DataPoint[] {
-                new DataPoint(0, 1),
-                new DataPoint(1, 5),
-                new DataPoint(2, 3),
-                new DataPoint(3, 2),
-                new DataPoint(4, 6)
-        });
-        graph.getViewport().setXAxisBoundsManual(true);
-        graph.getViewport().setYAxisBoundsManual(true);
-//        graph.getViewport().setMinimalViewport(minX, maxX, 0, maxY);
-
-        graph.addSeries(series);
     }
 
     @Override
@@ -141,13 +219,30 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
-    public void runThread(View view){
-//        new Thread(new SensorReceiverRunnable("192.168.1.1", "8080", handler)).run();
-//        if (mBound)
-//            textView.setText(textView.getText() + "Service is still bound");
-//        else
-//            textView.setText(textView.getText() + "Service is not bound");
+    public void getMessage(View view){
+        // Create and send a message to the service, using a supported 'what' value
         setMainMessenger();
+        Message msg = Message.obtain();
+        msg.what = SensorReceiverService.MSG_GET_TEST_MESSAGE;
+        try {
+            mService.send(msg);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Remote Exception in SET_MAIN_MESSENGER");
+        }
+
+    }
+
+    public void getTestedObject(View view){
+        // Create and send a message to the service, using a supported 'what' value
+        setMainMessenger();
+        Message msg = Message.obtain();
+        msg.what = SensorReceiverService.MSG_GET_TEST_OBJECTS;
+        try {
+            mService.send(msg);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Remote Exception in SET_MAIN_MESSENGER");
+        }
+
     }
 
     private void setMainMessenger(){
@@ -163,7 +258,6 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, "Remote Exception in SET_MAIN_MESSENGER");
         }
     }
-
 
     public void startReceiver(View view){
         if (!mBound) return;
@@ -182,8 +276,45 @@ public class MainActivity extends AppCompatActivity {
         try {
             mService.send(msg);
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Log.e(TAG, e.getMessage());
         }
+    }
+
+    public void setEnableService(View view){
+        if (mBound) {
+            Message msg = Message.obtain();
+            msg.what = SensorReceiverService.MSG_STOP_LISTENING;
+            try {
+                mService.send(msg);
+            }
+            catch (RemoteException e){
+                Log.e(TAG, "Remote Exception when stop listening onDestroy");
+            }
+            unbindService(mConnection);
+            mBound = false;
+            Intent intent = new Intent(this, com.example.blindspotdetection.SensorReceiverService.class);
+            stopService(intent);
+        }
+        else{
+            Intent intent = new Intent(this, com.example.blindspotdetection.SensorReceiverService.class);
+            startService(intent);
+            bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
+
+            setMainMessenger();
+        }
+    }
+
+    public void play(View view){
+        if (player.isPlaying()){
+            player.pause();
+        }
+        else{
+            player.create(getApplicationContext(), R.raw.grandblue_test);
+            player.start();
+        }
+    }
+    private void setSound(){
+        player = MediaPlayer.create(getApplicationContext(), R.raw.grandblue_test);
     }
 
     private BluetoothAdapter setUpBluetooth(){

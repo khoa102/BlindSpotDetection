@@ -1,5 +1,7 @@
 package com.example.blindspotdetection;
 
+import android.util.Log;
+
 import java.net.DatagramPacket;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -22,6 +24,10 @@ public class SensorProcessor {
 
     /** A byte array that stores all the byte in a Datagram packet that is passed to this class. */
     private byte[] data;
+
+    /** A TAG for logging. */
+    private static final String TAG = "SensorProcessor";
+
     // Channel Config
     private final int txChannelEn = 3;
     private final int numTxAzimAnt = 2;
@@ -59,14 +65,18 @@ public class SensorProcessor {
         data = packet.getData();
     }
 
+    public void loadPacket(byte[] buffer){
+        data = buffer;
+        Log.i(TAG, String.format("Length of data: %d", data.length));
+    }
     public void loadPacket(DatagramPacket packet){
         data = packet.getData();
+        Log.i(TAG, String.format("Length of data: %d", data.length));
     }
-    public boolean processData(byte[] data){
+    public boolean processData(){
         int len;
         int index = 0;
         byte[] slice;
-
         byte lastSevenMagicWord[] = new byte[7];
         lastSevenMagicWord[0] = 1;
         lastSevenMagicWord[1] = 4;
@@ -83,24 +93,41 @@ public class SensorProcessor {
         do {
             slice = Arrays.copyOfRange(data, index,index+1);
             index++;
+            Log.i(TAG,  String.format("%02X ", slice[0]));
+            Log.i(TAG, String.format("Length of data: %d", data.length));
+            Log.i(TAG, String.format("index: %d", index));
             if (Arrays.equals(slice, firstMagicWorld) && (index + 7) <= data.length) {
-                data = new byte[7];
+                Log.i(TAG, "Found first magic Word");
                 slice = Arrays.copyOfRange(data, index,index+7);
                 index += 7;
-                if (Arrays.equals(slice, lastSevenMagicWord))
+                Log.i(TAG,  String.format("%02X %02X %02X %02X %02X %02X %02X ", slice[0], slice[0],slice[0],slice[0],slice[0],slice[0],slice[0]));
+                if (Arrays.equals(slice, lastSevenMagicWord)) {
                     start = true;
+                    Log.i(TAG, "Found the rest of magic Word");
+                }
+                else {
+                    Log.i(TAG, "Not Found the rest of magic Word");
+                }
+            }
+            else {
+                Log.i(TAG, "NOT found first magic Word");
             }
         } while (index <= data.length && !start);
 
         // If no frame header is found, return False.
-        if (!start)
+        if (!start) {
+            Log.i(TAG, "NOT FOUND THE START OF THE FRAME");
             return false;
-
+        }
         // A variable to store the frame header data
         Map<String, Long> frameHeader = new HashMap<String, Long>();
 
         // Reading the frame
         index = readFrameHeader(frameHeader, data, index);
+//        for (int i = 0; i < frameName.length; i++) {
+//            Log.i(TAG, frameName[i] + ": " +frameHeader.get(frameName[i]));
+//        }
+//        Log.i(TAG, String.format("Index: %d", index));
 
         Map<String, Long> TLVheader;
 
@@ -110,53 +137,80 @@ public class SensorProcessor {
 
             // Reading TLV header
             index = readTLVHeader(TLVheader, data, index);
-            for (String aTLVheaderName : TLVheaderName) {
-                System.out.println(aTLVheaderName + ": " + TLVheader.get(aTLVheaderName));
-            }
+//            for (String aTLVheaderName : TLVheaderName) {
+//                Log.i(TAG, aTLVheaderName + ": " + TLVheader.get(aTLVheaderName));
+//            }
 
             // Reading the TLV data
             switch(TLVheader.get("type").intValue()) {
                 case 1:
                     if (TLVheader.get("length").intValue() > 0) {
                         // Get detected object descriptor
-                        slice = Arrays.copyOfRange(data, index,index+2);
-                        index+= 2;
-                        int numObj = (int)Integer.toUnsignedLong(ByteBuffer.wrap(slice).order(ByteOrder.LITTLE_ENDIAN).getShort());
-                        slice = Arrays.copyOfRange(data, index,index+2);
-                        index+=2;
-                        int xqzQFormat = (int)Integer.toUnsignedLong(ByteBuffer.wrap(slice).order(ByteOrder.LITTLE_ENDIAN).getShort());
+                        //slice = Arrays.copyOfRange(data, index,index+2);
+                        int numObj = data[index] + data[index+1] * 256; //(int)Integer.toUnsignedLong(ByteBuffer.wrap(slice).order(ByteOrder.LITTLE_ENDIAN).getShort());
+                        detectedObjects = new DetectedObject[numObj];
+                        index += 2;
+//                        slice = Arrays.copyOfRange(data, index,index+2);
+                        int xqzQFormat = (int) Math.pow(2, data[index] + data[index+1] * 256);//(int)Integer.toUnsignedLong(ByteBuffer.wrap(slice).order(ByteOrder.LITTLE_ENDIAN).getShort()));
+                        index += 2;
 
                         System.out.println("TLV Names: List of Detected Objects");
                         System.out.println("Number of Obj: " + numObj);
                         System.out.println("xyzQ Format: " + xqzQFormat);
 
-                        data = new byte[numObj * DETECTED_OBJ_STRUCT_SIZE];
                         slice = Arrays.copyOfRange(data, index,index+ (numObj * DETECTED_OBJ_STRUCT_SIZE));
                         index += numObj * DETECTED_OBJ_STRUCT_SIZE;
 
                         byte[][] matrix = reshape(slice, DETECTED_OBJ_STRUCT_SIZE, numObj);
-                        for (int row = 0; row < matrix.length; row ++) {
-                            for (int col = 0; col < matrix[0].length; col ++) {
-                                System.out.print(String.format("%02X ", matrix[row][col]) + "\t");
-                            }
-                            System.out.println();
-                        }
+//                        for (int row = 0; row < matrix.length; row ++) {
+//                            for (int col = 0; col < matrix[0].length; col ++) {
+//                                System.out.print(String.format("%02X ", matrix[row][col]) + "\t");
+//                            }
+//                            System.out.println();
+//                        }
 
+                        int count = 0; // counting the objects added to array.
                         // Process each object
                         for (byte[] row : matrix) {
+                            // Getting the range
                             int rangeIdx = row[0] + row[1] * 256;
                             double range = rangeIdx * rangeIdxToMeters;
-                            System.out.println("Range Index: " + rangeIdx);
-                            System.out.println("Range: " + range);
+//                            System.out.println("Range Index: " + rangeIdx);
+//                            System.out.println("Range: " + range);
 
-                            // Slice is used for unsigned number
-                            slice = Arrays.copyOfRange(row, 2, 4);
-                            int dopplerIdx = ByteBuffer.wrap(slice).order(ByteOrder.LITTLE_ENDIAN).getShort();
+                            // Getting doppler
+                            // Asuming that doppler is signed int
+//                            slice = Arrays.copyOfRange(row, 2, 4);  // Slice is used for unsigned number
+                            double dopplerIdx = row[2] + row[3] * 256; //ByteBuffer.wrap(slice).order(ByteOrder.LITTLE_ENDIAN).getShort();
+                            if (dopplerIdx > numDopplerBins/2 -1)
+                                dopplerIdx -= numDopplerBins;
                             double doppler = dopplerIdx * dopplerResolutionMps;
-                            System.out.println("Doppler Index: " + dopplerIdx);
-                            System.out.println("Doppler: " + doppler + " m/s");
+//                            System.out.println("Doppler Index: " + dopplerIdx);
+//                            System.out.println("Doppler: " + doppler + " m/s");
 
+                            // Getting peakVal
+                            int peakVal = row[4] + row[5] * 256;
+
+                            // Getting x, y, z
+                            double x = row[6] + row[7] * 256;
+                            double y = row[8] + row[9] * 256;
+                            double z = row[10] + row[11] * 256;
+
+                            if (x > 32767) x -= 65536;
+                            if (y > 32767) y -= 65536;
+                            if (z > 32767) z -= 65536;
+
+                            x = x /(double) xqzQFormat;
+                            y = y / (double)xqzQFormat;
+                            z = z / (double)xqzQFormat;
+
+
+                            // Create a detected object
+                            DetectedObject object = new DetectedObject(range, doppler, peakVal, x, y, z);
+                            detectedObjects[count] = object;
+                            count ++;
                             // Question: Is doppler, peak Val and x,y,z signed or unsigned
+
                         }
                     }
                     break;
@@ -173,17 +227,15 @@ public class SensorProcessor {
                 case 5:
                     break;
                 case 6:
-                    data = new byte[24];
                     slice = Arrays.copyOfRange(data, index,index+24);
                     index += 24;
                     index+= 2;
                     break;
                 default:
                     System.out.println("Failed to detect the whole frame");
-                    break;
+                    return false;
             }
         }
-
         // Return True if works successfully
         return true;
     }
@@ -252,5 +304,28 @@ public class SensorProcessor {
             }
         }
         return matrix;
+    }
+
+    public DetectedObject[] getDetectedObjects() {
+        return detectedObjects;
+    }
+
+    public void sortDetectedObjects(){
+        int n = detectedObjects.length;
+        for (int i=1; i<n; ++i)
+        {
+            DetectedObject key = detectedObjects[i];
+            int j = i-1;
+
+            /* Move elements of arr[0..i-1], that are
+               greater than key, to one position ahead
+               of their current position */
+            while (j>=0 && detectedObjects[j].compareTo(key) > 0)
+            {
+                detectedObjects[j+1] = detectedObjects[j];
+                j = j-1;
+            }
+            detectedObjects[j+1] = key;
+        }
     }
 }

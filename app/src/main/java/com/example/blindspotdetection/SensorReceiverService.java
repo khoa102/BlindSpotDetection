@@ -13,11 +13,7 @@ import android.os.RemoteException;
 import android.util.Log;
 import android.widget.Toast;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -31,28 +27,34 @@ public class SensorReceiverService extends Service {
     private HandlerThread thread;
 
     /** A TAG for logging. */
-    static final String TAG = "SensorReceiverService";
+    private static final String TAG = "SensorReceiverService";
 
     /**  Command to the service to set Main Handler. */
-    static final int MSG_SET_MAIN_MESSENGER = 1;
+    public static final int MSG_SET_MAIN_MESSENGER = 1;
     /**  Command to the service to start listening for UDP packet.  */
-    static final int MSG_START_LISTENING = 2;
+    public static final int MSG_START_LISTENING = 2;
     /**  Command to the service to start listening for UDP packet.  */
-    static final int MSG_STOP_LISTENING = 3;
+    public static final int MSG_STOP_LISTENING = 3;
     /**  Command to the service to stop the service. */
-    static final int MSG_STOP_SERVICE = 4;
+    public static final int MSG_STOP_SERVICE = 4;
+    /**  Command to the service to get a test message from the serivce. */
+    public static final int MSG_GET_TEST_MESSAGE = 5;
+    /**  Command to the service to get a test Arrays of DetectObject from the serivce. */
+    public static final int MSG_GET_TEST_OBJECTS = 6;
 
-
+    /** An object to read the receive data packet and process it. */
+    SensorProcessor sensorprocessor = new SensorProcessor();
     /** Keeps track of main clients. */
-    Messenger mainClient;
+    private Messenger mainClient;
     /**  Target we publish for clients to send messages to Service Handler. */
-    Messenger mMessenger;
-    Message message;
+    private Messenger mMessenger;
+    private Message message;
 
     private DatagramSocket socket;
     private boolean running = false;
-    private byte[] buf = new byte[1025];
+    private byte[] buf = new byte[1472];
 
+    private int countFrame = 0;
     /** Handler that receives messages from the thread */
     private final class ServiceHandler extends Handler {
         ServiceHandler(Looper looper) {
@@ -66,8 +68,66 @@ public class SensorReceiverService extends Service {
                     System.out.println("receive message");
 
                     mainClient = msg.replyTo;
+                    break;
+                case MSG_START_LISTENING:
+                    running = true;
+                    try {
+                        socket = new DatagramSocket(4445);
+                        socket.setSoTimeout(10000);
+                    } catch (SocketException e){
+                        Log.e(TAG, "Socket Exception");
+                    }
+                    while (running) {
+                        DatagramPacket packet = new DatagramPacket(buf, buf.length);
+                        try {
+
+                            System.out.println("Setting up socket. Waiting: ");
+                            socket.receive(packet);
+                            countFrame ++;
+                            System.out.println("Packet received!");
+                            String result = new String(packet.getData(), 0, packet.getLength());
+//                            InetAddress address = packet.getAddress();
+//                            int port = packet.getPort();
+//
+//                            packet = new DatagramPacket(buf, buf.length, address, port);
+//                            socket.send(packet);
+
+//                            sensorprocessor.loadPacket(packet);
+//                            // If packet can't be read, skip this packet.
+//                            if (!sensorprocessor.processData()) continue;
+//                            System.out.print("SENDING DATA TO MAIN");
+                            message = new Message();
+                            message.obj = packet.getData();
+//                            message.obj = result;
+                            message.what = MainActivity.MSG_DETECTED_OBJECT;
+//                            message.obj = sensorprocessor.getDetectedObjects();
+                            mainClient.send(message);
+
+                        }  catch (IOException e) {
+//                            e.printStackTrace();
+                            Log.e(TAG, "IO Exception");
+                        } catch (RemoteException e){
+//                            e.printStackTrace();
+                            Log.e(TAG, "Remote Exception");
+                        }
+
+                        if (mServiceHandler.hasMessages(MSG_STOP_LISTENING)){
+                            running = false;
+                            socket.close();
+                        }
+                    }
+                    break;
+                case MSG_STOP_LISTENING:
+                    break;
+                case MSG_STOP_SERVICE:
+//                    // Stop the service using the startId, so that we don't stop
+//                    // the service in the middle of handling another job
+                    System.out.println("Stopping service");
+                    stopSelf(msg.arg1);
+                case MSG_GET_TEST_MESSAGE:
                     message = new Message();
-                    message.obj = "Receive from Service";
+                    message.what = MSG_GET_TEST_MESSAGE;
+                    message.obj = "Receive from Service. Count Frame: " + countFrame;
                     try {
                         mainClient.send(message);
                     } catch (RemoteException e) {
@@ -76,55 +136,21 @@ public class SensorReceiverService extends Service {
 
                     System.out.println("Message sent");
                     break;
-                case MSG_START_LISTENING:
+                case MSG_GET_TEST_OBJECTS:
+                    message = new Message();
+                    message.what = MainActivity.MSG_DETECTED_OBJECT;
+                    DetectedObject[] detectedObjects = new DetectedObject[4];
+                    detectedObjects[0] = new DetectedObject(1, 0, 0, 1, 1, 1);
+                    detectedObjects[1] = new DetectedObject(1.5, 0, 0, 1, 3, 0.5);
+                    detectedObjects[2] = new DetectedObject(2, 0, 0, 2, 1, 3);
+                    detectedObjects[3] = new DetectedObject(3, 0, 0, 3, 2, 2);
+                    message.obj = detectedObjects;
                     try {
-                        socket = new DatagramSocket(4445);
-                        socket.setSoTimeout(1000);
-                    } catch (SocketException e){
-                        Log.e(TAG, "Socket Exception");
-                    }
-                    running = true;
-                    while (running) {
-                        DatagramPacket packet = new DatagramPacket(buf, buf.length);
-                        try {
-
-                            System.out.println("Setting up socket. Waiting: ");
-                            socket.receive(packet);
-                            System.out.println("Packet received!");
-                            String received = new String(packet.getData(), 0, packet.getLength());
-
-//                            InetAddress address = packet.getAddress();
-//                            int port = packet.getPort();
-//
-//                            packet = new DatagramPacket(buf, buf.length, address, port);
-//                            socket.send(packet);
-                            if (received.equals("end")){
-                                running = false;
-                                socket.close();
-                            }
-                            Toast.makeText(getApplicationContext(), "Receive Packet", Toast.LENGTH_SHORT).show();
-
-                            message = new Message();
-                            message.obj = received;
-                            System.out.println("Sending Message!");
-                            mainClient.send(message);
-                        }  catch (IOException e) {
-//                            e.printStackTrace();
-                            Log.e(TAG, "IO Exception");
-                        } catch (RemoteException e){
-//                            e.printStackTrace();
-                            Log.e(TAG, "Remote Exception");
-                        }
-                        if (mServiceHandler.hasMessages(MSG_STOP_LISTENING)){
-                            running = false;
-                            socket.close();
-                        }
+                        mainClient.send(message);
+                    } catch (RemoteException e) {
+                        Log.e(TAG, "Remote Exception while sending message back to main.");
                     }
                     break;
-                case MSG_STOP_SERVICE:
-//                    // Stop the service using the startId, so that we don't stop
-//                    // the service in the middle of handling another job
-                    stopSelf(msg.arg1);
                 default:
                     super.handleMessage(message);
             }
@@ -138,7 +164,7 @@ public class SensorReceiverService extends Service {
         // main thread, which we don't want to block. We also make it
         // background priority so CPU-intensive work doesn't disrupt our UI.
         thread = new HandlerThread("Radar Sensor Receiver",
-                Process.THREAD_PRIORITY_BACKGROUND);
+                Process.THREAD_PRIORITY_DEFAULT);
         thread.start();
 
 
@@ -146,6 +172,7 @@ public class SensorReceiverService extends Service {
         mServiceLooper = thread.getLooper();
         mServiceHandler = new ServiceHandler(mServiceLooper);
         mMessenger = new Messenger(mServiceHandler);
+
     }
 
     @Override
@@ -169,13 +196,18 @@ public class SensorReceiverService extends Service {
 
     @Override
     public boolean onUnbind(Intent intent) {
-        if (!socket.isClosed()) socket.close();
-
+        Toast.makeText(this, "unbinding", Toast.LENGTH_SHORT).show();
+        if (socket != null) {
+            if (!socket.isClosed()) socket.close();
+        }
         return true;
     }
 
     @Override
     public void onDestroy() {
         Toast.makeText(this, "service done", Toast.LENGTH_SHORT).show();
+        if (socket != null) {
+            if (!socket.isClosed()) socket.close();
+        }
     }
 }

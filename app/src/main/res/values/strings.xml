@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">BlindSpotDetection</string>
+    <string name="play_sound">Play Sound</string>
 </resources>
