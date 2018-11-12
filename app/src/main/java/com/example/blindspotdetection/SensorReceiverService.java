@@ -16,10 +16,11 @@ import android.widget.Toast;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.net.SocketException;
 
-
+/**
+ *  Android Service that will constantly listen to UDP packet even when phone is asleep.
+ */
 public class SensorReceiverService extends Service {
     private Looper mServiceLooper;
     private ServiceHandler mServiceHandler;
@@ -44,17 +45,19 @@ public class SensorReceiverService extends Service {
 
     /** An object to read the receive data packet and process it. */
     SensorProcessor sensorprocessor = new SensorProcessor();
+
     /** Keeps track of main clients. */
     private Messenger mainClient;
+
     /**  Target we publish for clients to send messages to Service Handler. */
     private Messenger mMessenger;
     private Message message;
 
     private DatagramSocket socket;
-    private boolean running = false;
-    private byte[] buf = new byte[1472];
+    private byte[] buf = new byte[1500];
 
     private int countFrame = 0;
+
     /** Handler that receives messages from the thread */
     private final class ServiceHandler extends Handler {
         ServiceHandler(Looper looper) {
@@ -70,7 +73,7 @@ public class SensorReceiverService extends Service {
                     mainClient = msg.replyTo;
                     break;
                 case MSG_START_LISTENING:
-                    running = true;
+                    boolean running = true;
                     try {
                         socket = new DatagramSocket(4445);
                         socket.setSoTimeout(10000);
@@ -78,6 +81,7 @@ public class SensorReceiverService extends Service {
                         Log.e(TAG, "Socket Exception");
                     }
                     while (running) {
+//                        buf = new byte[1500];
                         DatagramPacket packet = new DatagramPacket(buf, buf.length);
                         try {
 
@@ -85,7 +89,7 @@ public class SensorReceiverService extends Service {
                             socket.receive(packet);
                             countFrame ++;
                             System.out.println("Packet received!");
-                            String result = new String(packet.getData(), 0, packet.getLength());
+//                            String result = new String(packet.getData(), 0, packet.getLength());
 //                            InetAddress address = packet.getAddress();
 //                            int port = packet.getPort();
 //
@@ -96,18 +100,15 @@ public class SensorReceiverService extends Service {
 //                            // If packet can't be read, skip this packet.
 //                            if (!sensorprocessor.processData()) continue;
 //                            System.out.print("SENDING DATA TO MAIN");
-                            message = new Message();
+                            message = Message.obtain();
                             message.obj = packet.getData();
 //                            message.obj = result;
                             message.what = MainActivity.MSG_DETECTED_OBJECT;
 //                            message.obj = sensorprocessor.getDetectedObjects();
                             mainClient.send(message);
-
                         }  catch (IOException e) {
-//                            e.printStackTrace();
                             Log.e(TAG, "IO Exception");
                         } catch (RemoteException e){
-//                            e.printStackTrace();
                             Log.e(TAG, "Remote Exception");
                         }
 
@@ -126,7 +127,7 @@ public class SensorReceiverService extends Service {
                     stopSelf(msg.arg1);
                 case MSG_GET_TEST_MESSAGE:
                     message = new Message();
-                    message.what = MSG_GET_TEST_MESSAGE;
+                    message.what = MainActivity.MSG_GET_TEST_MESSAGE;
                     message.obj = "Receive from Service. Count Frame: " + countFrame;
                     try {
                         mainClient.send(message);
@@ -172,6 +173,9 @@ public class SensorReceiverService extends Service {
         mServiceLooper = thread.getLooper();
         mServiceHandler = new ServiceHandler(mServiceLooper);
         mMessenger = new Messenger(mServiceHandler);
+
+        // Set boundary of sensorProcessor
+        sensorprocessor.setDetectionBound(-1, 1, 0, 5);
 
     }
 

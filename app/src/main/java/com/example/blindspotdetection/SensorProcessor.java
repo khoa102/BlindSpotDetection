@@ -1,3 +1,15 @@
+/**
+ * Author: Khoa Tran
+ *
+ * Description: This is a class is designed for the Blind Spot Detection System. The goal of this class is process
+ *              the data buffer that is received from the sensor. The SensorProcessor object will load in a buffer
+ *              that should be a frame of data, process that frame, store all the information that is processed inside
+ *              itself. These information can then be access by calling getter methods. Currently, if a new frame is load
+ *              and process then the information from the previous frame would be overwritten.
+ *
+ *
+ */
+
 package com.example.blindspotdetection;
 
 import android.util.Log;
@@ -9,6 +21,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ *  Process data that is received from sensor.
+ */
 public class SensorProcessor {
     /** A variable that store all the frame header's header name*/
     private final String frameName[] = {"version", "totalPacketLen", "platform", "frameNumber", "timeCpuCycles", "numDetectedObj", "numTLVs", "subFrameNumber"};
@@ -27,6 +42,16 @@ public class SensorProcessor {
 
     /** A TAG for logging. */
     private static final String TAG = "SensorProcessor";
+
+    /** A Flag for whether any detected object is in the detection boundary. */
+    private boolean isInBoundary = false;
+
+    // Variable for setting boundary
+    private int min_x;
+    private int max_x;
+    private int min_y;
+    private int max_y;
+
 
     // Channel Config
     private final int txChannelEn = 3;
@@ -65,16 +90,35 @@ public class SensorProcessor {
         data = packet.getData();
     }
 
+
+    /**
+     *  A function to load data buffer that contains one frame of data from the sensor.
+     * @param buffer    A byte array that contains one frame of data from sensor.
+     */
     public void loadPacket(byte[] buffer){
         data = buffer;
         Log.i(TAG, String.format("Length of data: %d", data.length));
     }
-    public void loadPacket(DatagramPacket packet){
-        data = packet.getData();
-        Log.i(TAG, String.format("Length of data: %d", data.length));
+
+    /**
+     *  A function to set the detection boundary. The area inside this boundary is the detection zone.
+     * @param min_x The minimum x value that is detected for warning
+     * @param max_x The maximum x value that is detected for warning
+     * @param min_y The minimum y value that is detected for warning
+     * @param max_y The minimum y value that is detected for warning
+     */
+    public void setDetectionBound(int min_x, int max_x, int min_y, int max_y){
+        this.min_x = min_x;
+        this.min_y = min_y;
+        this.max_x = max_x;
+        this.max_y = max_y;
     }
+
+    /**
+     *  A function to process the data that is load using loadPacket().
+     * @return  A boolean variable that shows that whether the data is processed successfully or not. Return true if success.
+     */
     public boolean processData(){
-        int len;
         int index = 0;
         byte[] slice;
         byte lastSevenMagicWord[] = new byte[7];
@@ -89,18 +133,21 @@ public class SensorProcessor {
         byte firstMagicWorld[] = new byte[1];
         firstMagicWorld[0] = 2;
 
+        // Finding the beginning of the frame
         boolean start = false;
         do {
             slice = Arrays.copyOfRange(data, index,index+1);
             index++;
-            Log.i(TAG,  String.format("%02X ", slice[0]));
-            Log.i(TAG, String.format("Length of data: %d", data.length));
-            Log.i(TAG, String.format("index: %d", index));
+
+            // Logging used for debugging
+//            Log.i(TAG,  String.format("%02X ", slice[0]));
+//            Log.i(TAG, String.format("Length of data: %d", data.length));
+//            Log.i(TAG, String.format("index: %d", index));
             if (Arrays.equals(slice, firstMagicWorld) && (index + 7) <= data.length) {
                 Log.i(TAG, "Found first magic Word");
                 slice = Arrays.copyOfRange(data, index,index+7);
                 index += 7;
-                Log.i(TAG,  String.format("%02X %02X %02X %02X %02X %02X %02X ", slice[0], slice[0],slice[0],slice[0],slice[0],slice[0],slice[0]));
+                Log.i(TAG,  String.format("%02X %02X %02X %02X %02X %02X %02X ", slice[0], slice[1],slice[2],slice[3],slice[4],slice[5],slice[6]));
                 if (Arrays.equals(slice, lastSevenMagicWord)) {
                     start = true;
                     Log.i(TAG, "Found the rest of magic Word");
@@ -119,24 +166,20 @@ public class SensorProcessor {
             Log.i(TAG, "NOT FOUND THE START OF THE FRAME");
             return false;
         }
-        // A variable to store the frame header data
-        Map<String, Long> frameHeader = new HashMap<String, Long>();
 
-        // Reading the frame
+        // Reading the frameheader
+        Map<String, Long> frameHeader = new HashMap<>();
         index = readFrameHeader(frameHeader, data, index);
-//        for (int i = 0; i < frameName.length; i++) {
-//            Log.i(TAG, frameName[i] + ": " +frameHeader.get(frameName[i]));
-//        }
-//        Log.i(TAG, String.format("Index: %d", index));
-
-        Map<String, Long> TLVheader;
 
         // Reading in the all TLV for one frame
+        Map<String, Long> TLVheader;
         for (int i = 0; i < frameHeader.get("numTLVs"); i ++) {
-            TLVheader = new HashMap<String, Long>();
+            TLVheader = new HashMap<>();
 
             // Reading TLV header
             index = readTLVHeader(TLVheader, data, index);
+
+            // Code for debugging
 //            for (String aTLVheaderName : TLVheaderName) {
 //                Log.i(TAG, aTLVheaderName + ": " + TLVheader.get(aTLVheaderName));
 //            }
@@ -146,12 +189,11 @@ public class SensorProcessor {
                 case 1:
                     if (TLVheader.get("length").intValue() > 0) {
                         // Get detected object descriptor
-                        //slice = Arrays.copyOfRange(data, index,index+2);
-                        int numObj = data[index] + data[index+1] * 256; //(int)Integer.toUnsignedLong(ByteBuffer.wrap(slice).order(ByteOrder.LITTLE_ENDIAN).getShort());
+                        int numObj = data[index] + data[index+1] * 256;
                         detectedObjects = new DetectedObject[numObj];
                         index += 2;
 //                        slice = Arrays.copyOfRange(data, index,index+2);
-                        int xqzQFormat = (int) Math.pow(2, data[index] + data[index+1] * 256);//(int)Integer.toUnsignedLong(ByteBuffer.wrap(slice).order(ByteOrder.LITTLE_ENDIAN).getShort()));
+                        int xqzQFormat = (int) Math.pow(2, data[index] + data[index+1] * 256);
                         index += 2;
 
                         System.out.println("TLV Names: List of Detected Objects");
@@ -175,18 +217,13 @@ public class SensorProcessor {
                             // Getting the range
                             int rangeIdx = row[0] + row[1] * 256;
                             double range = rangeIdx * rangeIdxToMeters;
-//                            System.out.println("Range Index: " + rangeIdx);
-//                            System.out.println("Range: " + range);
 
                             // Getting doppler
                             // Asuming that doppler is signed int
-//                            slice = Arrays.copyOfRange(row, 2, 4);  // Slice is used for unsigned number
-                            double dopplerIdx = row[2] + row[3] * 256; //ByteBuffer.wrap(slice).order(ByteOrder.LITTLE_ENDIAN).getShort();
+                            double dopplerIdx = row[2] + row[3] * 256;
                             if (dopplerIdx > numDopplerBins/2 -1)
                                 dopplerIdx -= numDopplerBins;
                             double doppler = dopplerIdx * dopplerResolutionMps;
-//                            System.out.println("Doppler Index: " + dopplerIdx);
-//                            System.out.println("Doppler: " + doppler + " m/s");
 
                             // Getting peakVal
                             int peakVal = row[4] + row[5] * 256;
@@ -205,12 +242,14 @@ public class SensorProcessor {
                             z = z / (double)xqzQFormat;
 
 
+                            // Check to see if object is in boundary of not.
+                            if (x > min_x && x < max_x && y > min_y && y < max_y)
+                                isInBoundary = true;
+
                             // Create a detected object
                             DetectedObject object = new DetectedObject(range, doppler, peakVal, x, y, z);
                             detectedObjects[count] = object;
                             count ++;
-                            // Question: Is doppler, peak Val and x,y,z signed or unsigned
-
                         }
                     }
                     break;
@@ -236,6 +275,8 @@ public class SensorProcessor {
                     return false;
             }
         }
+
+        this.sortDetectedObjects();
         // Return True if works successfully
         return true;
     }
@@ -306,11 +347,26 @@ public class SensorProcessor {
         return matrix;
     }
 
+    /**
+     *    A function that returns the array of current detected objects.
+     * @return  An array of DetectedObject
+     */
     public DetectedObject[] getDetectedObjects() {
         return detectedObjects;
     }
 
-    public void sortDetectedObjects(){
+    /**
+     *  A function that returns the boolean value of whether an object is detected to be in boundary or not.
+     * @return  the boolean value of whether an object is detected to be in boundary or not. True means there is detected objects inside boundary.
+     */
+    public boolean getIsInBound(){
+        return isInBoundary;
+    }
+
+    /**
+     *    A function that sorts all the current detected objects using insertion sort.
+     */
+    private void sortDetectedObjects(){
         int n = detectedObjects.length;
         for (int i=1; i<n; ++i)
         {

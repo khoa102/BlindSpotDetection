@@ -31,9 +31,15 @@ Log:
 - Oct 18: Send the data to the Mobile App to test the processing on the mobile app.
 - Oct 19: Found that a lot of packets are lost when send through UDP. Needs to figure out is it because of the code or the hardware (The AP specifically).
 - Oct 22: Fix a bug in the processing and still try to fix the packet losing problem. Move the data processing from the listener service to the main thread.
-- Oct 23: Finish processing the date from the sensor and send the data to the main UI thread.
-- Oct 24: Display the detected object data on a graph.
+- Oct 23: Finished processing the date from the sensor and send the data to the main UI thread.
+- Oct 24: Displayed the detected object data on a graph.
 - Oct 25: Play sounds.
+- Nov 1: Created the basic of a view. Add normal image to android. Look at the custom view definition.
+- Nov 5: Completed the play sound when detects part. Successfully import the png image of a car for the new UI.
+- Nov 7: Completed the draft for Implementation Documentation and User Manual.
+- Nov 9: Played sound when objects is in detected boundary.
+- Nov 11: Completed the basic SensorView.
+- Nov 12: Complete the new UI. Add an activity for configuration.
 
 What I will do next:
  - Play sounds when detected an object and when the objects leave the detection zone.

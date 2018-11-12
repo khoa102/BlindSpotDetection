@@ -25,6 +25,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".ConfigureActivity"
+            android:label="@string/configuration_activity_label"
+            android:parentActivityName=".MainActivity">
+
+            <!-- Parent Activity metadata to support 4.0 and lower.-->
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value=".MainActivity"/>
+
+        </activity>
     </application>
 
 </manifest>

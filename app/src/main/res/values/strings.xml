@@ -1,4 +1,11 @@
 <resources>
     <string name="app_name">BlindSpotDetection</string>
     <string name="play_sound">Play Sound</string>
+    <string name="true_string">True</string>
+    <string name="false_string">False</string>
+    <string name="car_representation">Car Representation</string>
+    <string name="enable_service">Enable Service</string>
+    <string name="start_listening">Start Listening</string>
+    <string name="action_configure">Configure</string>
+    <string name="configuration_activity_label">Configuration</string>
 </resources>

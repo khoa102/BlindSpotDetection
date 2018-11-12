@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- These are the attributes that make up the SesnorDisplayView-->
+    <declare-styleable name="SensorDisplayView">
+
+        <!-- Default degree of the senor-->
+        <attr name="sensorDegree" format="integer"/>
+        <attr name="sensorPosition" format="enum">
+            <enum name="left" value="0"/>
+            <enum name="right" value="1"/>
+        </attr>
+        <attr name="objectDetected" format="boolean"/>
+    </declare-styleable>
+
+    <declare-styleable name="LovelyView">
+        <attr name="circleColor" format="color" />
+        <attr name="circleLabel" format="string"></attr>
+        <attr name="labelColor" format="color"></attr>
+    </declare-styleable>
+</resources>

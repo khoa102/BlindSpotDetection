@@ -6,7 +6,9 @@ import android.content.pm.PackageManager;
 import android.widget.Toast;
 import com.example.blindspotdetection.R;
 
-
+/**
+ *  @deprecated A Class that is used to set up connection. It is currently deprecated.
+ */
 public class SensorConnection{
     private BluetoothAdapter mBluetoothAdapter;
     public SensorConnection(BluetoothAdapter adapter){
@@ -14,6 +16,11 @@ public class SensorConnection{
 
     }
 
+    /**
+     *  Check to see if BLE is available on the current device or not.
+     * @param context   Current Application context
+     * @return  true if BLE is available and otherwise false.
+     */
     public Boolean checkBLEAvailability(Context context){
         // Use this check to determine whether BLE is supported on the device. Then
         // you can selectively disable BLE-related features.
