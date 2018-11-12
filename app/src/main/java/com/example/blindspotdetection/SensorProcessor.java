@@ -301,8 +301,9 @@ public class SensorProcessor {
         //byte slice[] = new byte [4];
         for (String aFrameName : frameName) {
             byte[] slice = Arrays.copyOfRange(data, index, index + 4);
+            long value = slice[0] + slice[1] * 256 + slice[2] *  65536 + slice[3] * 16777216;
             index += 4;
-            frameHeader.put(aFrameName, Integer.toUnsignedLong(ByteBuffer.wrap(slice).order(ByteOrder.LITTLE_ENDIAN).getInt()));
+            frameHeader.put(aFrameName, value);
         }
 
         return index;
@@ -319,8 +320,9 @@ public class SensorProcessor {
     private int readTLVHeader(Map<String, Long> TLVheader, byte[] data, int index){
         for (String aTLVheaderName : TLVheaderName) {
             byte[] slice = Arrays.copyOfRange(data, index, index + 4);
+            long value = slice[0] + slice[1] * 256 + slice[2] *  65536 + slice[3] * 16777216;
             index += 4;
-            TLVheader.put(aTLVheaderName, Integer.toUnsignedLong(ByteBuffer.wrap(slice).order(ByteOrder.LITTLE_ENDIAN).getInt()));
+            TLVheader.put(aTLVheaderName, value);
         }
         return index;
     }
