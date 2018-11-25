@@ -54,7 +54,7 @@ public class SensorReceiverService extends Service {
     private Message message;
 
     private DatagramSocket socket;
-    private byte[] buf = new byte[1500];
+    private byte[] buf = new byte[256];
 
     private int countFrame = 0;
 
@@ -100,6 +100,12 @@ public class SensorReceiverService extends Service {
 //                            // If packet can't be read, skip this packet.
 //                            if (!sensorprocessor.processData()) continue;
 //                            System.out.print("SENDING DATA TO MAIN");
+                            byte[] result = packet.getData();
+                            for (int i = 0; i< 256; i ++){
+//                                Log.i(TAG,  String.format("%02X ",result[i]));
+                                System.out.print(String.format("%02X ",result[i]));
+                            }
+
                             message = Message.obtain();
                             message.obj = packet.getData();
 //                            message.obj = result;

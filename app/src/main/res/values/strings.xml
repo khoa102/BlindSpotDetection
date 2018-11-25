@@ -5,7 +5,17 @@
     <string name="false_string">False</string>
     <string name="car_representation">Car Representation</string>
     <string name="enable_service">Enable Service</string>
+    <string name="disable_service">Disable Service</string>
     <string name="start_listening">Start Listening</string>
     <string name="action_configure">Configure</string>
     <string name="configuration_activity_label">Configuration</string>
+    <string name="angle_of_detection">Angle of Detection</string>
+    <string name="angle_textbox_hint">Integer 0-180</string>
+    <string name="update_angle_button">Update Angle</string>
+    <string name="boundary_label">Boundary of Dectection</string>
+    <string name="min_x_label">MIn x:</string>
+    <string name="max_x_label">Max x:</string>
+    <string name="min_y_label">Min y:</string>
+    <string name="max_y_label">Max y:</string>
+    <string name="update_boundary_button">Update Boundary</string>
 </resources>

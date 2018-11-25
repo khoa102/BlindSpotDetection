@@ -1,11 +1,12 @@
 package com.example.blindspotdetection;
 
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothManager;
+//import android.bluetooth.BluetoothAdapter;
+//import android.bluetooth.BluetoothManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.graphics.Color;
 import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.IBinder;
@@ -13,13 +14,13 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
-import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.series.DataPoint;
@@ -32,17 +33,27 @@ import com.jjoe64.graphview.series.PointsGraphSeries;
 public class MainActivity extends AppCompatActivity {
 //    /** Variable for setting up connection*/
 //    private SensorConnection sensorConnection;
-    private final static int REQUEST_ENABLE_BT = 1;
+//    private final static int REQUEST_ENABLE_BT = 1;
 
     /** View that is used to put information on the screen */
     private TextView textView;
     GraphView graph;
+    private Button endStartServiceButton;
 
-    /** A Point Series to represent the detected objects. */
-    PointsGraphSeries<DataPoint> pointSeries;
+    /** A Point Series to represent the detected objects inside boundary. */
+    PointsGraphSeries<DataPoint> inPointSeries;
+
+    /** A Point Series to represent the detected objects outside boundary. */
+    PointsGraphSeries<DataPoint> outPointSeries;
 
     /** A list of detected data in the current frame. */
     DetectedObject[] objects;
+
+    /** An array of objects in boundary */
+    private DetectedObject[] inBoundObjects;
+
+    /** An array of objects not in boundary */
+    private DetectedObject[] outBoundObjects;
 
     /** Media Player object to play detecting object sound.. */
     MediaPlayer detectedPlayer;
@@ -77,6 +88,9 @@ public class MainActivity extends AppCompatActivity {
     /**  Command to the service to get a test message from the Service. */
     public static final int MSG_GET_TEST_MESSAGE = 5;
 
+    /** Request code for communicating between activity*/
+    private static final int CONF_REQUEST_CODE = 100;
+
     private Handler handler = new Handler(Looper.getMainLooper()){
         @Override
         public void handleMessage(Message msg) {
@@ -91,28 +105,49 @@ public class MainActivity extends AppCompatActivity {
                     sensorprocessor.loadPacket(buffer);
                     boolean result = sensorprocessor.processData();
                     if (result){
-                        textView.setText(String.format("%s\n\n Successfully process data frame \n", textView.getText()));
+//                        textView.setText(String.format("%s\n\n Successfully process data frame \n", textView.getText()));
                         objects = sensorprocessor.getDetectedObjects();
-                        for (DetectedObject object1 : objects) {
-                            textView.setText(String.format("%s%s", textView.getText(), object1.toString()));
-                        }
-                        textView.setText(String.format("%s\n", textView.getText()));
+                        inBoundObjects = sensorprocessor.getInBoundObjects();
+                        outBoundObjects = sensorprocessor.getOutBoundObjects();
+//                        for (DetectedObject object1 : objects) {
+//                            textView.setText(String.format("%s%s", textView.getText(), object1.toString()));
+//                        }
+//                        textView.setText(String.format("%s\n", textView.getText()));
 
-                        DataPoint newDataPoint[] = new DataPoint[objects.length];
+//                        DataPoint newDataPoint[] = new DataPoint[objects.length];
+                        DataPoint inBoundPoints [] = new DataPoint[inBoundObjects.length];
+                        DataPoint outBoundPoints [] = new DataPoint[outBoundObjects.length];
                         int index = 0;
-                        for (DetectedObject object : objects){
-                            newDataPoint[index] = new DataPoint(object.getX(), object.getY());
+//                        for (DetectedObject object : objects){
+//                            newDataPoint[index] = new DataPoint(object.getX(), object.getY());
+//                            index++;
+//                        }
+
+                        index = 0;
+                        for (DetectedObject object : inBoundObjects){
+                            inBoundPoints[index] = new DataPoint(object.getX(), object.getY());
                             index++;
                         }
-                        pointSeries.resetData(newDataPoint);
+
+                        index = 0;
+                        for (DetectedObject object : outBoundObjects){
+                            outBoundPoints[index] = new DataPoint(object.getX(), object.getY());
+                            index++;
+                        }
+//                        outPointSeries.resetData(newDataPoint);
+                        outPointSeries.resetData(outBoundPoints);
+                        inPointSeries.resetData(inBoundPoints);
                     }
                     else {
                         textView.setText(String.format("%s\n\n Failed process data frame \n", textView.getText()));
                     }
 
-                    if (isDetected == true){
+                    // Variable for difference in time
+                    final int TIME_DIFFERENCE = 1000;
+
+                    if (isDetected){
                         // The object should not be detected for as least 2 seconds???
-                        if (!sensorprocessor.getIsInBound() && System.currentTimeMillis() - lastDetectedTime > 200){
+                        if (!sensorprocessor.getIsInBound() && System.currentTimeMillis() - lastDetectedTime > TIME_DIFFERENCE){
                             isDetected = false;
                             lastDetectedTime = 0;
                             leavePlayer.start();
@@ -172,6 +207,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialize sensorConnection and textView
         textView = findViewById(R.id.mainText);
+        endStartServiceButton = findViewById(R.id.StartService);
 //        sensorConnection = new SensorConnection(setUpBluetooth());
 
 //        if (sensorConnection.checkBLEAvailability(getApplicationContext()))
@@ -191,20 +227,28 @@ public class MainActivity extends AppCompatActivity {
         // Setting up the graph view to display dectected objects
         graph = findViewById(R.id.graph);
         graph.getViewport().setXAxisBoundsManual(true);
-        graph.getViewport().setMinX(-2);
-        graph.getViewport().setMaxX(2);
+        graph.getViewport().setMinX(-3);
+        graph.getViewport().setMaxX(3);
 
         graph.getViewport().setYAxisBoundsManual(true);
         graph.getViewport().setMinY(0);
-        graph.getViewport().setMaxY(5);
+        graph.getViewport().setMaxY(3);
         graph.getViewport().setScrollable(false); // disables horizontal scrolling
         graph.getViewport().setScrollableY(false); // disables vertical scrolling
         graph.getViewport().setScalable(false); // disables horizontal zooming and scrolling
         graph.getViewport().setScalableY(false); // disables vertical zooming and scrolling
-        pointSeries = new PointsGraphSeries<>();
-        pointSeries.setShape(PointsGraphSeries.Shape.RECTANGLE);
 
-        graph.addSeries(pointSeries);
+        inPointSeries = new PointsGraphSeries<>();
+        inPointSeries.setShape(PointsGraphSeries.Shape.RECTANGLE);
+        inPointSeries.setColor(Color.GREEN);
+
+
+        outPointSeries = new PointsGraphSeries<>();
+        outPointSeries.setShape(PointsGraphSeries.Shape.RECTANGLE);
+        outPointSeries.setColor(Color.RED);
+
+        graph.addSeries(inPointSeries);
+        graph.addSeries(outPointSeries);
 
         sensorprocessor.setDetectionBound(-1, 1, 0, 3);
         setSound();
@@ -230,10 +274,25 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch(item.getItemId()){
             case R.id.action_configure:
-                startActivity(new Intent(this, ConfigureActivity.class));
+                startActivityForResult(new Intent(this, ConfigureActivity.class), CONF_REQUEST_CODE);
                 return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+//        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == CONF_REQUEST_CODE){
+            if (resultCode == RESULT_OK){
+                if (data != null){
+                    if (data.hasExtra("new_angle")){
+                        int newAngle = data.getIntExtra("new_angle", 160);
+                        Log.i(TAG, String.format("Receive new angle from configure activity: %d", newAngle));
+                    }
+                }
+            }
+        }
     }
 
     @Override
@@ -316,6 +375,7 @@ public class MainActivity extends AppCompatActivity {
             mBound = false;
             Intent intent = new Intent(this, com.example.blindspotdetection.SensorReceiverService.class);
             stopService(intent);
+            endStartServiceButton.setText(R.string.enable_service);
         }
         else{
             Intent intent = new Intent(this, com.example.blindspotdetection.SensorReceiverService.class);
@@ -323,6 +383,7 @@ public class MainActivity extends AppCompatActivity {
             bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
 
             setMainMessenger();
+            endStartServiceButton.setText(R.string.disable_service);
         }
     }
 
@@ -335,24 +396,25 @@ public class MainActivity extends AppCompatActivity {
         }
     }
     private void setSound(){
-        detectedPlayer = MediaPlayer.create(getApplicationContext(), R.raw.grandblue_test);
+        detectedPlayer = MediaPlayer.create(getApplicationContext(), R.raw.alert1);
+        leavePlayer = MediaPlayer.create(getApplicationContext(), R.raw.alert2);
     }
 
-    private BluetoothAdapter setUpBluetooth(){
-        // Getting the device bluetooth adapter
-        final BluetoothManager bluetoothManager =
-                (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-        BluetoothAdapter adapter = null;
-        if (bluetoothManager != null) {
-            adapter = bluetoothManager.getAdapter();
-        }
-
-        // Check to see if bluetooth is enabled or not
-        if (adapter == null || !adapter.isEnabled()) {
-            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
-        }
-
-        return adapter;
-    }
+//    private BluetoothAdapter setUpBluetooth(){
+//        // Getting the device bluetooth adapter
+//        final BluetoothManager bluetoothManager =
+//                (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+//        BluetoothAdapter adapter = null;
+//        if (bluetoothManager != null) {
+//            adapter = bluetoothManager.getAdapter();
+//        }
+//
+//        // Check to see if bluetooth is enabled or not
+//        if (adapter == null || !adapter.isEnabled()) {
+//            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+//            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+//        }
+//
+//        return adapter;
+//    }
 }

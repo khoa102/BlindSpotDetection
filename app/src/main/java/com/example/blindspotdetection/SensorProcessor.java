@@ -37,6 +37,12 @@ public class SensorProcessor {
     /** An array that stores the detected objects in the current frame. */
     private DetectedObject[] detectedObjects;
 
+    /** An array of objects in boundary */
+    private DetectedObject[] inBoundObjects;
+
+    /** An array of objects not in boundary */
+    private DetectedObject[] outBoundObjects;
+
     /** A byte array that stores all the byte in a Datagram packet that is passed to this class. */
     private byte[] data;
 
@@ -191,8 +197,10 @@ public class SensorProcessor {
                         // Get detected object descriptor
                         int numObj = data[index] + data[index+1] * 256;
                         detectedObjects = new DetectedObject[numObj];
+                        inBoundObjects = new DetectedObject[numObj];
+                        outBoundObjects = new DetectedObject[numObj];
+
                         index += 2;
-//                        slice = Arrays.copyOfRange(data, index,index+2);
                         int xqzQFormat = (int) Math.pow(2, data[index] + data[index+1] * 256);
                         index += 2;
 
@@ -211,27 +219,33 @@ public class SensorProcessor {
 //                            System.out.println();
 //                        }
 
-                        int count = 0; // counting the objects added to array.
+                        int count = 0; // counting the objects added to detectedObject array.
+                        int count1 = 0; // counting the objects added to inBoundOBject array.
+                        int count2 = 0; // counting the objects added to outBoundOBject array.
                         // Process each object
                         for (byte[] row : matrix) {
                             // Getting the range
-                            int rangeIdx = row[0] + row[1] * 256;
-                            double range = rangeIdx * rangeIdxToMeters;
+//                            int rangeIdx = row[0] + row[1] * 256;
+//                            double range = rangeIdx * rangeIdxToMeters;
 
                             // Getting doppler
                             // Asuming that doppler is signed int
-                            double dopplerIdx = row[2] + row[3] * 256;
-                            if (dopplerIdx > numDopplerBins/2 -1)
-                                dopplerIdx -= numDopplerBins;
-                            double doppler = dopplerIdx * dopplerResolutionMps;
+                            double dopplerIdx = row[0] + row[1] * 256;
+//                            double dopplerIdx = row[2] + row[3] * 256;
+//                            if (dopplerIdx > numDopplerBins/2 -1)
+//                                dopplerIdx -= numDopplerBins;
+//                            double doppler = dopplerIdx * dopplerResolutionMps;
 
                             // Getting peakVal
-                            int peakVal = row[4] + row[5] * 256;
+//                            int peakVal = row[4] + row[5] * 256;
 
                             // Getting x, y, z
-                            double x = row[6] + row[7] * 256;
-                            double y = row[8] + row[9] * 256;
-                            double z = row[10] + row[11] * 256;
+//                            double x = row[6] + row[7] * 256;
+//                            double y = row[8] + row[9] * 256;
+//                            double z = row[10] + row[11] * 256;
+                            double x = row[2] + row[3] * 256;
+                            double y = row[4] + row[5] * 256;
+                            double z = row[6] + row[7] * 256;
 
                             if (x > 32767) x -= 65536;
                             if (y > 32767) y -= 65536;
@@ -242,15 +256,29 @@ public class SensorProcessor {
                             z = z / (double)xqzQFormat;
 
 
-                            // Check to see if object is in boundary of not.
-                            if (x > min_x && x < max_x && y > min_y && y < max_y)
-                                isInBoundary = true;
 
                             // Create a detected object
-                            DetectedObject object = new DetectedObject(range, doppler, peakVal, x, y, z);
+                            DetectedObject object = new DetectedObject(0, 0, 0, x, y, z);
                             detectedObjects[count] = object;
                             count ++;
+
+                            Log.i(TAG, "Min_x: " + min_x + "\tMax x: " + max_x + "\tActual x: " + x);
+                            Log.i(TAG, "Min_y: " + min_y + "\tMax y: " + max_y + "\tActual y: " + y);
+                            // Check to see if object is in boundary of not.
+                            if (x >= min_x && x <= max_x && y >= min_y && y <= max_y) {
+                                Log.i(TAG, "Is in boundary");
+                                isInBoundary = true;
+                                inBoundObjects[count1] = object;
+                                count1++;
+                            } else {
+                                Log.i(TAG, "Is out boundary");
+                                outBoundObjects[count2] = object;
+                                count2++;
+                            }
                         }
+
+                        inBoundObjects = Arrays.copyOf(inBoundObjects, count1);
+                        outBoundObjects = Arrays.copyOf(outBoundObjects, count2);
                     }
                     break;
                 case 2:
@@ -276,7 +304,9 @@ public class SensorProcessor {
             }
         }
 
-        this.sortDetectedObjects();
+        this.sortObjects(detectedObjects);
+        this.sortObjects(inBoundObjects);
+        this.sortObjects(outBoundObjects);
         // Return True if works successfully
         return true;
     }
@@ -358,6 +388,21 @@ public class SensorProcessor {
     }
 
     /**
+     *    A function that returns the array of current detected objects inside boundary.
+     * @return  An array of DetectedObject
+     */
+    public DetectedObject[] getInBoundObjects() {
+        return inBoundObjects;
+    }
+
+    /**
+     *    A function that returns the array of current detected objects outside of boundary.
+     * @return  An array of DetectedObject
+     */
+    public DetectedObject[] getOutBoundObjects() {
+        return outBoundObjects;
+    }
+    /**
      *  A function that returns the boolean value of whether an object is detected to be in boundary or not.
      * @return  the boolean value of whether an object is detected to be in boundary or not. True means there is detected objects inside boundary.
      */
@@ -368,22 +413,22 @@ public class SensorProcessor {
     /**
      *    A function that sorts all the current detected objects using insertion sort.
      */
-    private void sortDetectedObjects(){
-        int n = detectedObjects.length;
+    private void sortObjects(DetectedObject[] objects){
+        int n = objects.length;
         for (int i=1; i<n; ++i)
         {
-            DetectedObject key = detectedObjects[i];
+            DetectedObject key = objects[i];
             int j = i-1;
 
             /* Move elements of arr[0..i-1], that are
                greater than key, to one position ahead
                of their current position */
-            while (j>=0 && detectedObjects[j].compareTo(key) > 0)
+            while (j>=0 && objects[j].compareTo(key) > 0)
             {
-                detectedObjects[j+1] = detectedObjects[j];
+                objects[j+1] = objects[j];
                 j = j-1;
             }
-            detectedObjects[j+1] = key;
+            objects[j+1] = key;
         }
     }
 }
