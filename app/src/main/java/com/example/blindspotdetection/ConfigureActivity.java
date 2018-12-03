@@ -61,6 +61,17 @@ public class ConfigureActivity extends AppCompatActivity {
 
         if (min_x >= max_x || min_y > max_y)
             Toast.makeText(getApplicationContext(), "Invalid Boundary",Toast.LENGTH_SHORT);
+        else{
+            Intent i = new Intent();
+            i.putExtra("min_x", min_x);
+            i.putExtra("max_x", max_x);
+            i.putExtra("min_y", min_y);
+            i.putExtra("max_y", max_y);
+            setResult(RESULT_OK, i);
+            Log.i(TAG,"Valid Angle, sent to main.");
+            finish();
+        }
+
     }
 
 }

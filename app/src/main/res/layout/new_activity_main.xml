@@ -4,7 +4,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
 
     <Button
         android:id="@+id/StartService"
@@ -15,38 +16,32 @@
         android:onClick="setEnableService"
         android:text="@string/enable_service"
         app:layout_constraintBottom_toBottomOf="@+id/background"
-        app:layout_constraintEnd_toStartOf="@+id/StartListening"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/Car" />
 
-    <Button
-        android:id="@+id/StartListening"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:layout_marginTop="8dp"
-        android:onClick="startReceiver"
-        android:text="@string/start_listening"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/StartService"
-        app:layout_constraintTop_toBottomOf="@+id/Car"
-        app:layout_constraintVertical_bias="0.503" />
+    <!--<Button-->
+        <!--android:id="@+id/StartListening"-->
+        <!--android:layout_width="wrap_content"-->
+        <!--android:layout_height="wrap_content"-->
+        <!--android:onClick="startReceiver"-->
+        <!--android:text="@string/start_listening"-->
+        <!--app:layout_constraintBaseline_toBaselineOf="@+id/StartService"-->
+        <!--app:layout_constraintEnd_toEndOf="parent"-->
+        <!--app:layout_constraintStart_toEndOf="@+id/StartService" />-->
 
     <ImageView
         android:id="@+id/background"
-        android:layout_width="384dp"
-        android:layout_height="514dp"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         android:background="@android:color/transparent"
         android:contentDescription="background"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHeight_percent="0.5"
-        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintHeight_percent="1"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.666"
-        app:layout_constraintWidth_percent="0.31"
+        app:layout_constraintWidth_percent="1"
         app:srcCompat="@android:color/darker_gray" />
 
     <ImageView

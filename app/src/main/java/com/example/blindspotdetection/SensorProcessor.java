@@ -102,6 +102,10 @@ public class SensorProcessor {
      * @param buffer    A byte array that contains one frame of data from sensor.
      */
     public void loadPacket(byte[] buffer){
+        isInBoundary = false;
+        detectedObjects = new DetectedObject[0];
+        inBoundObjects = new DetectedObject[0];
+        outBoundObjects = new DetectedObject[0];
         data = buffer;
         Log.i(TAG, String.format("Length of data: %d", data.length));
     }
@@ -113,6 +117,7 @@ public class SensorProcessor {
      * @param min_y The minimum y value that is detected for warning
      * @param max_y The minimum y value that is detected for warning
      */
+
     public void setDetectionBound(int min_x, int max_x, int min_y, int max_y){
         this.min_x = min_x;
         this.min_y = min_y;
@@ -153,7 +158,7 @@ public class SensorProcessor {
                 Log.i(TAG, "Found first magic Word");
                 slice = Arrays.copyOfRange(data, index,index+7);
                 index += 7;
-                Log.i(TAG,  String.format("%02X %02X %02X %02X %02X %02X %02X ", slice[0], slice[1],slice[2],slice[3],slice[4],slice[5],slice[6]));
+//                Log.i(TAG,  String.format("%02X %02X %02X %02X %02X %02X %02X ", slice[0], slice[1],slice[2],slice[3],slice[4],slice[5],slice[6]));
                 if (Arrays.equals(slice, lastSevenMagicWord)) {
                     start = true;
                     Log.i(TAG, "Found the rest of magic Word");
@@ -173,6 +178,7 @@ public class SensorProcessor {
             return false;
         }
 
+//        Log.i(TAG, "Reading Frame");
         // Reading the frameheader
         Map<String, Long> frameHeader = new HashMap<>();
         index = readFrameHeader(frameHeader, data, index);
@@ -181,7 +187,7 @@ public class SensorProcessor {
         Map<String, Long> TLVheader;
         for (int i = 0; i < frameHeader.get("numTLVs"); i ++) {
             TLVheader = new HashMap<>();
-
+//            Log.i(TAG, "Reading TLV");
             // Reading TLV header
             index = readTLVHeader(TLVheader, data, index);
 
@@ -193,9 +199,15 @@ public class SensorProcessor {
             // Reading the TLV data
             switch(TLVheader.get("type").intValue()) {
                 case 1:
+//                    Log.i(TAG, "Type 1");
                     if (TLVheader.get("length").intValue() > 0) {
                         // Get detected object descriptor
                         int numObj = data[index] + data[index+1] * 256;
+
+                        // If not objects found
+                        if (numObj <= 0)
+                            break;
+
                         detectedObjects = new DetectedObject[numObj];
                         inBoundObjects = new DetectedObject[numObj];
                         outBoundObjects = new DetectedObject[numObj];
@@ -212,12 +224,6 @@ public class SensorProcessor {
                         index += numObj * DETECTED_OBJ_STRUCT_SIZE;
 
                         byte[][] matrix = reshape(slice, DETECTED_OBJ_STRUCT_SIZE, numObj);
-//                        for (int row = 0; row < matrix.length; row ++) {
-//                            for (int col = 0; col < matrix[0].length; col ++) {
-//                                System.out.print(String.format("%02X ", matrix[row][col]) + "\t");
-//                            }
-//                            System.out.println();
-//                        }
 
                         int count = 0; // counting the objects added to detectedObject array.
                         int count1 = 0; // counting the objects added to inBoundOBject array.
@@ -225,27 +231,27 @@ public class SensorProcessor {
                         // Process each object
                         for (byte[] row : matrix) {
                             // Getting the range
-//                            int rangeIdx = row[0] + row[1] * 256;
-//                            double range = rangeIdx * rangeIdxToMeters;
+                            int rangeIdx = row[0] + row[1] * 256;
+                            double range = rangeIdx * rangeIdxToMeters;
 
                             // Getting doppler
                             // Asuming that doppler is signed int
-                            double dopplerIdx = row[0] + row[1] * 256;
-//                            double dopplerIdx = row[2] + row[3] * 256;
-//                            if (dopplerIdx > numDopplerBins/2 -1)
-//                                dopplerIdx -= numDopplerBins;
-//                            double doppler = dopplerIdx * dopplerResolutionMps;
+//                            double dopplerIdx = row[0] + row[1] * 256;
+                            double dopplerIdx = row[2] + row[3] * 256;
+                            if (dopplerIdx > numDopplerBins/2 -1)
+                                dopplerIdx -= numDopplerBins;
+                            double doppler = dopplerIdx * dopplerResolutionMps;
 
                             // Getting peakVal
-//                            int peakVal = row[4] + row[5] * 256;
+                            int peakVal = row[4] + row[5] * 256;
 
                             // Getting x, y, z
-//                            double x = row[6] + row[7] * 256;
-//                            double y = row[8] + row[9] * 256;
-//                            double z = row[10] + row[11] * 256;
-                            double x = row[2] + row[3] * 256;
-                            double y = row[4] + row[5] * 256;
-                            double z = row[6] + row[7] * 256;
+                            double x = row[6] + row[7] * 256;
+                            double y = row[8] + row[9] * 256;
+                            double z = row[10] + row[11] * 256;
+//                            double x = row[2] + row[3] * 256;
+//                            double y = row[4] + row[5] * 256;
+//                            double z = row[6] + row[7] * 256;
 
                             if (x > 32767) x -= 65536;
                             if (y > 32767) y -= 65536;
@@ -264,6 +270,8 @@ public class SensorProcessor {
 
                             Log.i(TAG, "Min_x: " + min_x + "\tMax x: " + max_x + "\tActual x: " + x);
                             Log.i(TAG, "Min_y: " + min_y + "\tMax y: " + max_y + "\tActual y: " + y);
+
+
                             // Check to see if object is in boundary of not.
                             if (x >= min_x && x <= max_x && y >= min_y && y <= max_y) {
                                 Log.i(TAG, "Is in boundary");
@@ -304,9 +312,14 @@ public class SensorProcessor {
             }
         }
 
-        this.sortObjects(detectedObjects);
-        this.sortObjects(inBoundObjects);
-        this.sortObjects(outBoundObjects);
+        if (detectedObjects != null)
+            this.sortObjects(detectedObjects);
+        if (inBoundObjects != null)
+            this.sortObjects(inBoundObjects);
+
+        if (outBoundObjects != null)
+            this.sortObjects(outBoundObjects);
+
         // Return True if works successfully
         return true;
     }
@@ -333,6 +346,7 @@ public class SensorProcessor {
             byte[] slice = Arrays.copyOfRange(data, index, index + 4);
             long value = slice[0] + slice[1] * 256 + slice[2] *  65536 + slice[3] * 16777216;
             index += 4;
+//            Log.i(TAG, String.format("%s: %s", aFrameName, value));
             frameHeader.put(aFrameName, value);
         }
 
@@ -352,6 +366,7 @@ public class SensorProcessor {
             byte[] slice = Arrays.copyOfRange(data, index, index + 4);
             long value = slice[0] + slice[1] * 256 + slice[2] *  65536 + slice[3] * 16777216;
             index += 4;
+//            Log.i(TAG, String.format("%s: %s", aTLVheaderName, value));
             TLVheader.put(aTLVheaderName, value);
         }
         return index;

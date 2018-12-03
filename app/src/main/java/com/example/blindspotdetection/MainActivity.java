@@ -35,25 +35,31 @@ public class MainActivity extends AppCompatActivity {
 //    private SensorConnection sensorConnection;
 //    private final static int REQUEST_ENABLE_BT = 1;
 
-    /** View that is used to put information on the screen */
-    private TextView textView;
-    GraphView graph;
+//    /** View that is used to put information on the screen */
+//    private TextView textView;
+//    GraphView graph;
+//    private Button endStartServiceButton;
+//
+//    /** A Point Series to represent the detected objects inside boundary. */
+//    PointsGraphSeries<DataPoint> inPointSeries;
+//
+//    /** A Point Series to represent the detected objects outside boundary. */
+//    PointsGraphSeries<DataPoint> outPointSeries;
+//
+//    /** A list of detected data in the current frame. */
+//    DetectedObject[] objects;
+//
+//    /** An array of objects in boundary */
+//    private DetectedObject[] inBoundObjects;
+//
+//    /** An array of objects not in boundary */
+//    private DetectedObject[] outBoundObjects;
+
+
     private Button endStartServiceButton;
 
-    /** A Point Series to represent the detected objects inside boundary. */
-    PointsGraphSeries<DataPoint> inPointSeries;
+    private SensorDisplayView leftSensorView;
 
-    /** A Point Series to represent the detected objects outside boundary. */
-    PointsGraphSeries<DataPoint> outPointSeries;
-
-    /** A list of detected data in the current frame. */
-    DetectedObject[] objects;
-
-    /** An array of objects in boundary */
-    private DetectedObject[] inBoundObjects;
-
-    /** An array of objects not in boundary */
-    private DetectedObject[] outBoundObjects;
 
     /** Media Player object to play detecting object sound.. */
     MediaPlayer detectedPlayer;
@@ -96,79 +102,100 @@ public class MainActivity extends AppCompatActivity {
         public void handleMessage(Message msg) {
             // Suppose to execute visualizer
             switch(msg.what) {
-                case MSG_GET_TEST_MESSAGE:
-                    textView.setText(String.format("%s%s", textView.getText(), msg.obj.toString()));
-                    break;
+//                case MSG_GET_TEST_MESSAGE:
+//                    textView.setText(String.format("%s%s", textView.getText(), msg.obj.toString()));
+//                    break;
                 case MSG_DETECTED_OBJECT:
                     byte buffer[] = (byte[]) msg.obj;
                     // An object to read the receive data packet and process it
                     sensorprocessor.loadPacket(buffer);
                     boolean result = sensorprocessor.processData();
-                    if (result){
-//                        textView.setText(String.format("%s\n\n Successfully process data frame \n", textView.getText()));
-                        objects = sensorprocessor.getDetectedObjects();
-                        inBoundObjects = sensorprocessor.getInBoundObjects();
-                        outBoundObjects = sensorprocessor.getOutBoundObjects();
-//                        for (DetectedObject object1 : objects) {
-//                            textView.setText(String.format("%s%s", textView.getText(), object1.toString()));
-//                        }
-//                        textView.setText(String.format("%s\n", textView.getText()));
-
+//                    if (result){
+////                        textView.setText(String.format("%s\n\n Successfully process data frame \n", textView.getText()));
+//                        objects = sensorprocessor.getDetectedObjects();
+//                        inBoundObjects = sensorprocessor.getInBoundObjects();
+//                        outBoundObjects = sensorprocessor.getOutBoundObjects();
+//
+//
+////                        for (DetectedObject object1 : objects) {
+////                            textView.setText(String.format("%s%s", textView.getText(), object1.toString()));
+////                        }
+////                        textView.setText(String.format("%s\n", textView.getText()));
+//
 //                        DataPoint newDataPoint[] = new DataPoint[objects.length];
-                        DataPoint inBoundPoints [] = new DataPoint[inBoundObjects.length];
-                        DataPoint outBoundPoints [] = new DataPoint[outBoundObjects.length];
-                        int index = 0;
-//                        for (DetectedObject object : objects){
+//                        DataPoint inBoundPoints[] = new DataPoint[inBoundObjects.length];
+//                        DataPoint outBoundPoints[] = new DataPoint[outBoundObjects.length];
+//                        int index = 0;
+//                        for (DetectedObject object : objects) {
 //                            newDataPoint[index] = new DataPoint(object.getX(), object.getY());
 //                            index++;
 //                        }
-
-                        index = 0;
-                        for (DetectedObject object : inBoundObjects){
-                            inBoundPoints[index] = new DataPoint(object.getX(), object.getY());
-                            index++;
-                        }
-
-                        index = 0;
-                        for (DetectedObject object : outBoundObjects){
-                            outBoundPoints[index] = new DataPoint(object.getX(), object.getY());
-                            index++;
-                        }
+//
+//                        index = 0;
+//                        for (DetectedObject object : inBoundObjects) {
+//                            inBoundPoints[index] = new DataPoint(object.getX(), object.getY());
+//                            index++;
+//                        }
+//
+//                        index = 0;
+//                        for (DetectedObject object : outBoundObjects) {
+//                            outBoundPoints[index] = new DataPoint(object.getX(), object.getY());
+//                            index++;
+//                        }
 //                        outPointSeries.resetData(newDataPoint);
-                        outPointSeries.resetData(outBoundPoints);
-                        inPointSeries.resetData(inBoundPoints);
-                    }
-                    else {
-                        textView.setText(String.format("%s\n\n Failed process data frame \n", textView.getText()));
-                    }
-
+//                        outPointSeries.resetData(outBoundPoints);
+//                        inPointSeries.resetData(inBoundPoints);
+//                    }
+//                    else {
+//                        textView.setText(String.format("%s\n\n Failed process data frame \n", textView.getText()));
+//                    }
+//
                     // Variable for difference in time
                     final int TIME_DIFFERENCE = 1000;
+//
+//                    if (isDetected){
+//                        // The object should not be detected for as least 2 seconds???
+//                        if (!sensorprocessor.getIsInBound() && System.currentTimeMillis() - lastDetectedTime > TIME_DIFFERENCE){
+//                            isDetected = false;
+//                            lastDetectedTime = 0;
+//                            leavePlayer.start();
+//                        }else if (sensorprocessor.getIsInBound()){
+//                            lastDetectedTime = System.currentTimeMillis();
+//                        }
+//                    }else {
+//                        if (sensorprocessor.getIsInBound()){
+//                            isDetected = true;
+//                            lastDetectedTime = System.currentTimeMillis();
+//                            detectedPlayer.start();
+//                        }
+//                    }
 
-                    if (isDetected){
-                        // The object should not be detected for as least 2 seconds???
-                        if (!sensorprocessor.getIsInBound() && System.currentTimeMillis() - lastDetectedTime > TIME_DIFFERENCE){
-                            isDetected = false;
-                            lastDetectedTime = 0;
-                            leavePlayer.start();
-                        }else if (sensorprocessor.getIsInBound()){
-                            lastDetectedTime = System.currentTimeMillis();
-                        }
-                    }else {
-                        if (sensorprocessor.getIsInBound()){
-                            isDetected = true;
-                            lastDetectedTime = System.currentTimeMillis();
-                            detectedPlayer.start();
+
+                    // New UI
+                    if (result) {
+                        if (isDetected) {
+                            // The object should not be detected for as least 2 seconds???
+                            if (!sensorprocessor.getIsInBound() && System.currentTimeMillis() - lastDetectedTime > TIME_DIFFERENCE) {
+                                isDetected = false;
+                                lastDetectedTime = 0;
+                                leftSensorView.setDetected(false);
+                                leavePlayer.start();
+                            } else if (sensorprocessor.getIsInBound()) {
+                                lastDetectedTime = System.currentTimeMillis();
+                            }
+                        } else {
+                            if (sensorprocessor.getIsInBound()) {
+                                isDetected = true;
+                                lastDetectedTime = System.currentTimeMillis();
+                                leftSensorView.setDetected(true);
+                                detectedPlayer.start();
+                                while(detectedPlayer.isPlaying()){
+
+                                }
+                                detectedPlayer.start();
+                            }
                         }
                     }
-//                    textView.setText(textView.getText());
-//                    String result = new String(buffer, 0, buffer.length);
-//                    textView.setText(textView.getText() +  result);//msg.obj.toString());
-//                    DetectedObject[] objects = (DetectedObject[]) msg.obj;
-
-//                    pointSeries.resetData(newDataPoint);
-////                    Toast.makeText(this, "Update Graph", Toast.LENGTH_SHORT).show();
-//                    Log.e(TAG, "UPDATE GRAPH");
                     break;
                 default:
                     super.handleMessage(msg);
@@ -190,6 +217,9 @@ public class MainActivity extends AppCompatActivity {
             // representation of that from the raw IBinder object.
             mService = new Messenger(service);
             mBound = true;
+            setMainMessenger();
+            setReceiver();
+            endStartServiceButton.setText(R.string.disable_service);
         }
 
         public void onServiceDisconnected(ComponentName className) {
@@ -197,23 +227,60 @@ public class MainActivity extends AppCompatActivity {
             // unexpectedly disconnected -- that is, its process crashed.
             mService = null;
             mBound = false;
+            endStartServiceButton.setText(R.string.enable_service);
         }
     };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
 
-        // Initialize sensorConnection and textView
-        textView = findViewById(R.id.mainText);
+        // New UI
+        setContentView(R.layout.new_activity_main);
         endStartServiceButton = findViewById(R.id.StartService);
+        leftSensorView = findViewById(R.id.leftSensor);
+
+//        //Old UI
+//        setContentView(R.layout.activity_main);
+//
+//        // Initialize sensorConnection and textView
+//        textView = findViewById(R.id.mainText);
+//        endStartServiceButton = findViewById(R.id.StartService);
 //        sensorConnection = new SensorConnection(setUpBluetooth());
 
 //        if (sensorConnection.checkBLEAvailability(getApplicationContext()))
 //            textView.setText(R.string.true_string);
 //        else
 //            textView.setText(R.string.false_string);
+//
+
+
+
+//        // Setting up the graph view to display dectected objects
+//        graph = findViewById(R.id.graph);
+//        graph.getViewport().setXAxisBoundsManual(true);
+//        graph.getViewport().setMinX(-3);
+//        graph.getViewport().setMaxX(3);
+//
+//        graph.getViewport().setYAxisBoundsManual(true);
+//        graph.getViewport().setMinY(0);
+//        graph.getViewport().setMaxY(3);
+//        graph.getViewport().setScrollable(false); // disables horizontal scrolling
+//        graph.getViewport().setScrollableY(false); // disables vertical scrolling
+//        graph.getViewport().setScalable(false); // disables horizontal zooming and scrolling
+//        graph.getViewport().setScalableY(false); // disables vertical zooming and scrolling
+//
+//        // Setting up both serires for graph
+//        inPointSeries = new PointsGraphSeries<>();
+//        inPointSeries.setShape(PointsGraphSeries.Shape.RECTANGLE);
+//        inPointSeries.setColor(Color.GREEN);
+//
+//        outPointSeries = new PointsGraphSeries<>();
+//        outPointSeries.setShape(PointsGraphSeries.Shape.RECTANGLE);
+//        outPointSeries.setColor(Color.RED);
+//
+//        graph.addSeries(inPointSeries);
+//        graph.addSeries(outPointSeries);
 
         // Bind to the service
         // Using explicit intent to avoid trouble
@@ -222,36 +289,12 @@ public class MainActivity extends AppCompatActivity {
         intent.putExtra("port", "8080");
         startService(intent);
         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
-        setMainMessenger();
+        Log.i(TAG, String.format("In onCreate() before setMain: %b", mBound));
 
-        // Setting up the graph view to display dectected objects
-        graph = findViewById(R.id.graph);
-        graph.getViewport().setXAxisBoundsManual(true);
-        graph.getViewport().setMinX(-3);
-        graph.getViewport().setMaxX(3);
-
-        graph.getViewport().setYAxisBoundsManual(true);
-        graph.getViewport().setMinY(0);
-        graph.getViewport().setMaxY(3);
-        graph.getViewport().setScrollable(false); // disables horizontal scrolling
-        graph.getViewport().setScrollableY(false); // disables vertical scrolling
-        graph.getViewport().setScalable(false); // disables horizontal zooming and scrolling
-        graph.getViewport().setScalableY(false); // disables vertical zooming and scrolling
-
-        inPointSeries = new PointsGraphSeries<>();
-        inPointSeries.setShape(PointsGraphSeries.Shape.RECTANGLE);
-        inPointSeries.setColor(Color.GREEN);
-
-
-        outPointSeries = new PointsGraphSeries<>();
-        outPointSeries.setShape(PointsGraphSeries.Shape.RECTANGLE);
-        outPointSeries.setColor(Color.RED);
-
-        graph.addSeries(inPointSeries);
-        graph.addSeries(outPointSeries);
-
+        Log.i(TAG, String.format("In onCreate() after setMainMessenger: %b", mBound));
         sensorprocessor.setDetectionBound(-1, 1, 0, 3);
         setSound();
+        Log.i(TAG, String.format("In onCreate() after setSound(): %b", mBound));
     }
 
     @Override
@@ -288,7 +331,15 @@ public class MainActivity extends AppCompatActivity {
                 if (data != null){
                     if (data.hasExtra("new_angle")){
                         int newAngle = data.getIntExtra("new_angle", 160);
+                        leftSensorView.setSensorDegree(newAngle);
                         Log.i(TAG, String.format("Receive new angle from configure activity: %d", newAngle));
+                    }
+                    else if (data.hasExtra("min_x") && data.hasExtra("max_x") && data.hasExtra("min_y") && data.hasExtra("max_y")){
+                        int min_x = data.getIntExtra("min_x", -1);
+                        int max_x = data.getIntExtra("max_x", 1);
+                        int min_y = data.getIntExtra("min_y", 0);
+                        int max_y = data.getIntExtra("max_y", 3);
+                        sensorprocessor.setDetectionBound(min_x, max_x, min_y, max_y);
                     }
                 }
             }
@@ -327,6 +378,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setMainMessenger(){
+        Log.i(TAG, String.format("In setMainMessenger: %b", mBound));
         if (!mBound) return;
 
         // Create and send a message to the service, using a supported 'what' value
@@ -340,7 +392,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void startReceiver(View view){
+    public void setReceiver(){
         if (!mBound) return;
 
         // Create and send a message to the service, using a supported 'what' value
@@ -352,8 +404,7 @@ public class MainActivity extends AppCompatActivity {
             msg.what = SensorReceiverService.MSG_STOP_LISTENING;
             running = false;
         }
-        // Create a CountDownTimer to make the SensorReceiver to report back every one minute.
-//        msg.obj = (60000, 10000);
+
         try {
             mService.send(msg);
         } catch (RemoteException e) {
@@ -363,14 +414,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void setEnableService(View view){
         if (mBound) {
-            Message msg = Message.obtain();
-            msg.what = SensorReceiverService.MSG_STOP_LISTENING;
-            try {
-                mService.send(msg);
-            }
-            catch (RemoteException e){
-                Log.e(TAG, "Remote Exception when stop listening onDestroy");
-            }
+            setReceiver();
             unbindService(mConnection);
             mBound = false;
             Intent intent = new Intent(this, com.example.blindspotdetection.SensorReceiverService.class);
@@ -382,8 +426,6 @@ public class MainActivity extends AppCompatActivity {
             startService(intent);
             bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
 
-            setMainMessenger();
-            endStartServiceButton.setText(R.string.disable_service);
         }
     }
 
@@ -395,6 +437,8 @@ public class MainActivity extends AppCompatActivity {
             detectedPlayer.start();
         }
     }
+
+
     private void setSound(){
         detectedPlayer = MediaPlayer.create(getApplicationContext(), R.raw.alert1);
         leavePlayer = MediaPlayer.create(getApplicationContext(), R.raw.alert2);

@@ -54,7 +54,7 @@ public class SensorReceiverService extends Service {
     private Message message;
 
     private DatagramSocket socket;
-    private byte[] buf = new byte[256];
+    private byte[] buf = new byte[1400];
 
     private int countFrame = 0;
 
@@ -68,7 +68,7 @@ public class SensorReceiverService extends Service {
 
             switch (msg.what) {
                 case MSG_SET_MAIN_MESSENGER:
-                    System.out.println("receive message");
+                    Log.i(TAG, "Receive Main Messenger");
 
                     mainClient = msg.replyTo;
                     break;
@@ -111,7 +111,8 @@ public class SensorReceiverService extends Service {
 //                            message.obj = result;
                             message.what = MainActivity.MSG_DETECTED_OBJECT;
 //                            message.obj = sensorprocessor.getDetectedObjects();
-                            mainClient.send(message);
+                            if (message != null)
+                                mainClient.send(message);
                         }  catch (IOException e) {
                             Log.e(TAG, "IO Exception");
                         } catch (RemoteException e){
